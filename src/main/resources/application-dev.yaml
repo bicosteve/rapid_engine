@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: rapid-engine
+
+  datasource:
+    url: ${H2DB}
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false
+        trace: false
+
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data.sql
+      platform: h2
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    virtual-host: /
+
+app:
+  rabbitmq:
+    exchange: ${RABBITMQ_EXCHANGE}
+    queue: ${RABBITMQ_QUEUE}
+    routing-key: ${RABBITMQ_ROUTING_KEY}
+
+
+server:
+  port: ${APP_PORT}
+
+logging:
+  level:
+    org.springframework.jdbc: ${LOGGING_LEVEL}
