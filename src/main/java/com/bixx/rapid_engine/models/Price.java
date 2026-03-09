@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -21,7 +22,7 @@ public class Price {
     private int price;
     private int priceDelta;
     private boolean isMainLine;
-    private float odds;
+    private BigDecimal odds;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

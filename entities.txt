@@ -77,6 +77,7 @@ prices
   price             INT             ← American odds
   price_delta       INT             ← how much odds moved
   is_main_line      BOOLEAN
+  odds              DECIMAL(10,2)
   created_at        TIMESTAMP
   updated_at        TIMESTAMP
 

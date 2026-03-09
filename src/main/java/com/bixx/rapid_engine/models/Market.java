@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -21,4 +22,6 @@ public class Market {
     private String eventId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private List<Participant> participants;
 }

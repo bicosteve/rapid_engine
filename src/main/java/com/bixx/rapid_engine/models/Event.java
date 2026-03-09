@@ -1,14 +1,12 @@
 package com.bixx.rapid_engine.models;
 
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
-@RequiredArgsConstructor
+@AllArgsConstructor
 @NoArgsConstructor
 @Builder
 public class Event {
@@ -23,4 +21,8 @@ public class Event {
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private Score score;
+    private List<Team> teams;
+    private List<Market> markets;
 }
