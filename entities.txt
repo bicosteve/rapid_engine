@@ -1,0 +1,86 @@
+events
+  event_id        VARCHAR(100)    PK — from Rundown
+  sport_id        INT
+  event_date      TIMESTAMP
+  venue_name      VARCHAR(100)
+  venue_location  VARCHAR(100)
+  season_type     VARCHAR(100)    e.g "2025-26 LALIGA"
+  season_year     INT
+  status          VARCHAR(50)     e.g "STATUS_SCHEDULED"
+  created_at      TIMESTAMP
+  updated_at      TIMESTAMP
+
+scores
+  id                    BIGINT          PK AUTO_INCREMENT
+  event_id              VARCHAR(100)    FK → events.event_id
+  event_status          VARCHAR(50)
+  event_status_detail   VARCHAR(50)
+  team_id_away          INT
+  team_id_home          INT
+  winner_away           TINYINT         0 or 1
+  winner_home           TINYINT         0 or 1
+  score_away            INT
+  score_home            INT
+  game_clock            INT
+  game_period           INT             0=not started, 1=first half, 2=second half
+  broadcast             VARCHAR(100)
+  created_at            TIMESTAMP
+  updated_at            TIMESTAMP
+
+teams
+  id              BIGINT          PK AUTO_INCREMENT
+  team_id         INT             ← Rundown's team ID e.g 3934
+  event_id        VARCHAR(100)    FK → events.event_id
+  name            VARCHAR(100)
+  abbreviation    VARCHAR(10)
+  is_home         BOOLEAN         DEFAULT FALSE
+  is_away         BOOLEAN         DEFAULT FALSE
+  record          VARCHAR(20)     e.g "5-11-10"
+  sport_id        INT
+  conference_id   INT
+  league_name     VARCHAR(100)
+  created_at      TIMESTAMP
+  updated_at      TIMESTAMP
+
+  UNIQUE (team_id, event_id)
+
+markets
+  id                  BIGINT          PK AUTO_INCREMENT
+  market_rundown_id   INT             ← Rundown's market ID e.g 2674437
+  market_type_id      INT             1=moneyline, 2=handicap, 3=totals
+  period_id           INT             0=full match, 1=first half, 2=second half
+  name                VARCHAR(50)     e.g "moneyline"
+  description         VARCHAR(100)    e.g "Moneyline: To win outright"
+  event_id            VARCHAR(100)    FK → events.event_id
+  created_at          TIMESTAMP
+  updated_at          TIMESTAMP
+
+participants
+  id                BIGINT          PK AUTO_INCREMENT
+  participant_type  INT             1=Home, 2=Draw, 3=Away, 4=Over, 5=Under
+  market_id         BIGINT          FK → markets.id
+  rundown_id        INT             ← Rundown's original ID (3934, 3, 9, 10)
+  name              VARCHAR(100)    e.g "Elche", "Draw", "Over"
+  type              VARCHAR(50)     TYPE_TEAM or TYPE_RESULT
+  created_at        TIMESTAMP
+  updated_at        TIMESTAMP
+
+  UNIQUE (participant_type, market_id)
+
+prices
+  id                BIGINT          PK AUTO_INCREMENT
+  price_rundown_id  VARCHAR(100)    ← Rundown's price ID e.g "194422431"
+  participant_id    BIGINT          FK → participants.id
+  bookmaker_id      INT             ← 3, 19, 23
+  line_id           VARCHAR(100)    ← Rundown's line ID
+  handicap_value    VARCHAR(20)     ← "+1.25", "2.5" etc — NULL for moneyline
+  price             INT             ← American odds
+  price_delta       INT             ← how much odds moved
+  is_main_line      BOOLEAN
+  created_at        TIMESTAMP
+  updated_at        TIMESTAMP
+
+****
+market_type_id = 1 (Moneyline) → 1=Home,  2=Draw,  3=Away
+market_type_id = 2 (Handicap)  → 1=Home,  3=Away
+market_type_id = 3 (Totals)    → 4=Over,  5=Under

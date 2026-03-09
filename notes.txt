@@ -1,0 +1,135 @@
+// Match Details
+
+json : meta -> delta_last_id
+
+Events
+* event_id string
+* sport_id int
+* event_date datetime
+    * score : map
+            * event_id : string
+            * event_status : string (STATUS_FULL_TIME/STATUS_SCHEDULED)
+            * team_id_away : int
+            * team_id_home : int
+    * teams : array
+        {
+            * team_id : int
+            * name : string
+            * is_away : true
+        },
+        {
+            * team_id : int
+            * name : string
+            * is_home : true
+        }
+    * markets : array
+        {
+            * id : int
+            * market_id : e.g 1
+            * name: str -> moneyline
+            participants : map
+                {
+                    "id" team_id (Away Team)
+                    "name": str eg Elche
+                        lines : array
+                            [0]"prices"{
+                                "3" {
+                                    "price" : int
+                                }
+                            }
+                },
+                {
+                    "id" team_id (Home Team)
+                    "name": str eg Villarreal
+                        lines : array
+                            [0]"prices"{
+                                "3" {
+                                    "price" : int
+                                }
+                            }
+                },
+                {
+                    "id" 3
+                    "name": str eg Draw
+                        lines : array
+                            [0]"prices"{
+                                "3" {
+                                    "price" : int
+                                }
+                            }
+                }
+        },
+        {
+            * id : int
+            * market_id : e.g 2
+            * name: str -> handicap
+            participants : map
+                {
+                    "id" team_id (Away Team)
+                    "name": str eg Elche
+                        lines : array
+                            [0]"prices"{
+                                "3" {
+                                    "price" : int
+                                }
+                            }
+                },
+                {
+                    "id" team_id (Home Team)
+                    "name": str eg Villarreal
+                        lines : array
+                            [0]"prices"{
+                                "3" {
+                                    "price" : int
+                                }
+                            }
+                },
+                {
+                    "id" 3
+                    "name": str eg Draw
+                        lines : array
+                            [0]"prices"{
+                                "3" {
+                                    "price" : int
+                                }
+                            }
+                }
+        },
+        {
+            * id : int
+            * market_id : e.g 3
+            * name: str -> totals
+            participants : map
+                {
+                    "id" team_id (Away Team)
+                    "name": str eg Elche
+                        lines : array
+                            [0]"prices"{
+                                "3" {
+                                    "price" : int
+                                }
+                            }
+                },
+                {
+                    "id" team_id (Home Team)
+                    "name": str eg Villarreal
+                        lines : array
+                            [0]"prices"{
+                                "3" {
+                                    "price" : int
+                                }
+                            }
+                },
+                {
+                    "id" 3
+                    "name": str eg Draw
+                        lines : array
+                            [0]"prices"{
+                                "3" {
+                                    "price" : int
+                                }
+                            }
+                }
+        },
+
+
