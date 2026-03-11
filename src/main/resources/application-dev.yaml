@@ -34,14 +34,17 @@ spring:
     password: ${RABBITMQ_PASSWORD}
     virtual-host: /
 
+
 app:
   rabbitmq:
     exchange: ${RABBITMQ_EXCHANGE}
     queue: ${RABBITMQ_QUEUE}
     routing-key: ${RABBITMQ_ROUTING_KEY}
-  rapid-api:
-    key: ${RAPID_API_KEY}
-    host: ${RAPID_API_BASE_URL}
+
+  rundown-api:
+    key: ${RUNDOWN_API_KEY}
+    host: ${RUNDOWN_BASE_URL}
+    sports-id: ${RUNDOWN_SPORT_ID}
 
 
 server:

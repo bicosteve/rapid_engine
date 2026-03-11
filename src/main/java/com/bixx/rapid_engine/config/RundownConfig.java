@@ -6,9 +6,10 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @Data
-@ConfigurationProperties(prefix = "app.rapid-api")
+@ConfigurationProperties(prefix = "app.rundown-api")
 public class RundownConfig {
     private String apiKey;
     private String baseUrl;
+    private String sportsId;
 
 }

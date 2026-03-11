@@ -1,5 +1,6 @@
 package com.bixx.rapid_engine.consumer;
 
+import com.bixx.rapid_engine.models.Event;
 import com.bixx.rapid_engine.repository.MatchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,14 +16,14 @@ public class MatchConsumer {
 
 
     @RabbitListener(queues = "${app.rabbitmq.queue}")
-    public void consume(String match){
-        // log.info("Consumer::received match {}",match.getMatchId());
-        this.matchRepository.insertMatch(match);
+    public void consume(Event event){
+        log.info("Consumer::received match {}",event.getEventId());
+        this.matchRepository.insertEvent(event);
 
         try{
-            log.info("Consumer:match {} inserted successfully",match.getMatchId());
+            log.info("Consumer::match {} inserted successfully",event.getEventId());
         } catch(Exception e) {
-            log.error("Consumer::error processing match {}:{}",match.getMatchId(),e.getMessage());
+            log.error("Consumer::error processing match {}:{}",event.getEventId(),e.getMessage());
             throw new RuntimeException(e);
 
         }

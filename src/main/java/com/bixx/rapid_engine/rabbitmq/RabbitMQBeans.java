@@ -20,7 +20,7 @@ public class RabbitMQBeans {
     // 01. Declare the queue
     @Bean
     public Queue matchesQueue(){
-        return new Queue(this.rabbitMQConfig.getExchange());
+        return new Queue(this.rabbitMQConfig.getQueue());
     }
 
     // 02. Declare the exchange
@@ -43,8 +43,8 @@ public class RabbitMQBeans {
 
     // 04. Jackson converter - used to serailize/deserialize messages as JSON
     @Bean
-    public MessageConverter messageConverter(){
-        return new Jackson2JsonMessageConverter();
+    public MessageConverter messageConverter(ObjectMapper objectMapper){
+        return new Jackson2JsonMessageConverter(objectMapper);
     }
 
     // 05. RabbitTemplate - used by producer to send messages
