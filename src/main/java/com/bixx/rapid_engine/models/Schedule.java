@@ -5,18 +5,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class Participant {
-    private Integer id;
-    private String type;
-    private String name;
-
-    private Integer marketId; // set by consumer
-
-    private List<Line> lines;
+public class Schedule {
+    private String seasonType;
+    private Integer seasonYear;
+    private String eventName;
+    private String eventHeadline;
 }

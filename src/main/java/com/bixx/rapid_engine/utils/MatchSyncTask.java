@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 public class MatchSyncTask {
     private final EventProducer eventProducer;
 
-    @Scheduled(fixedRate = 3_600_000, initialDelay = 60_000)
+    @Scheduled(fixedRate = 3_600_000, initialDelay = 30_000)
     public void fetchMatches(){
         log.info("Scheduler::triggering match producer");
         this.eventProducer.fetchAndPublishMatches();

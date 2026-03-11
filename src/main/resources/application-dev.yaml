@@ -2,30 +2,11 @@ spring:
   application:
     name: rapid-engine
 
-  datasource:
-    url: ${H2DB}
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
   data:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
 
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-      settings:
-        web-allow-others: false
-        trace: false
-
-  sql:
-    init:
-      mode: always
-      data-locations: classpath:data.sql
-      platform: h2
 
   rabbitmq:
     host: ${RABBITMQ_HOST}

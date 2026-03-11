@@ -8,8 +8,8 @@ import org.springframework.context.annotation.Configuration;
 @Data
 @ConfigurationProperties(prefix = "app.rundown-api")
 public class RundownConfig {
-    private String apiKey;
-    private String baseUrl;
+    private String key;
+    private String host;
     private String sportsId;
 
 }

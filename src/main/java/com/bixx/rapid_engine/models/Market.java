@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -14,14 +13,12 @@ import java.util.List;
 @Builder
 public class Market {
     private Integer id;
-    private Integer rundownMarketId;
-    private int marketTypeId;
+    private Integer marketId;
     private int periodId;
     private String name;
-    private String description;
-    private String eventId;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private String marketDescription;
+
+    private String eventId; // set by consumer before table insert
 
     private List<Participant> participants;
 }

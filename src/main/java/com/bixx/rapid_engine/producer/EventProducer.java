@@ -45,14 +45,14 @@ public class EventProducer {
             if(deltaLastId == null){
                 log.info("Producer::no delta_last_id found, fetching all events");
                 url = "%s/sports/%s/events/%s".formatted(
-                        this.rundownConfig.getBaseUrl(),
+                        this.rundownConfig.getHost(),
                         this.rundownConfig.getSportsId(),
                         today
                 );
             } else {
                 log.info("Producer::delta_last_id found {}, fetching updated events",deltaLastId);
                 url = "%s/sports/%s/events/%s?delta_last_id=%s".formatted(
-                        this.rundownConfig.getBaseUrl(),
+                        this.rundownConfig.getHost(),
                         this.rundownConfig.getSportsId(),
                         today,
                         deltaLastId
@@ -62,10 +62,10 @@ public class EventProducer {
 
 
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-TheRundown-Key", this.rundownConfig.getApiKey());
+            headers.set("X-TheRundown-Key", this.rundownConfig.getKey());
 
             HttpEntity<Void> entity = new HttpEntity<>(headers);
-            ResponseEntity<String> response = restTemplate.exchange(
+            ResponseEntity<String> response = this.restTemplate.exchange(
                     url,
                     HttpMethod.GET,
                     entity,
@@ -77,8 +77,8 @@ public class EventProducer {
                 return;
             }
 
-            // Response Headers
-            log.info("Headers returned with response {}",response.getHeaders());
+            String rawJson = response.getBody();
+            log.info("Producer:: raw response {}",rawJson);
 
             // 02. Parse the response into a list of Events
             RundownResponse rundownResponse = this.objectMapper
@@ -113,10 +113,9 @@ public class EventProducer {
                         event
                 );
 
-                log.info("Producer::published {} match to exchange ", event.getEventId());
             });
 
-            log.info("Producer::published {} matches", events.size());
+            log.info("Producer::published {} matches", events);
 
         } catch(Exception e) {
             log.error("Producer::error: {}", e.getMessage());
