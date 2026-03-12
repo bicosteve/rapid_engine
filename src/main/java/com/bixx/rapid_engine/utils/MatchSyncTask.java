@@ -12,9 +12,11 @@ import org.springframework.stereotype.Component;
 public class MatchSyncTask {
     private final EventProducer eventProducer;
 
-    @Scheduled(fixedRate = 3_600_000, initialDelay = 30_000)
+    @Scheduled(fixedRate = 3_600_000, initialDelay = 20_000)
     public void fetchMatches(){
+        // Scheduled to run after 1hr
+        // delay the first call after the app start with 20s
         log.info("Scheduler::triggering match producer");
-        this.eventProducer.fetchAndPublishMatches();
+        this.eventProducer.fetchEvents();
     }
 }

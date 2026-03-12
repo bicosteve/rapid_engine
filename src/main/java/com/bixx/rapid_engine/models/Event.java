@@ -14,8 +14,8 @@ public class Event {
     private String eventUuid;
     private Integer sportId;
     private LocalDateTime eventDate;
-    private LocalDateTime createdAt; // set by DB in consumer
-    private LocalDateTime updatedAt; // set by DB in consumer
+    private LocalDateTime createdAt; // to be set by DB in consumer
+    private LocalDateTime updatedAt; // tp be set by DB in consumer
 
     private Score score;
     private List<Team> teams;
