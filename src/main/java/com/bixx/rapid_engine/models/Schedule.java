@@ -10,8 +10,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 public class Schedule {
+    private Boolean conferenceCompetition;
     private String seasonType;
     private Integer seasonYear;
     private String eventName;
     private String eventHeadline;
+    private String attendance;
 }
