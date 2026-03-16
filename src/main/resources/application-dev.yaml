@@ -26,6 +26,7 @@ app:
     key: ${RUNDOWN_API_KEY}
     host: ${RUNDOWN_BASE_URL}
     sports-id: ${RUNDOWN_SPORT_IDS}
+    affiliate-id: ${AFFILIATES_ID}
 
 
 server:

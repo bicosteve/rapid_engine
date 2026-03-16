@@ -13,4 +13,5 @@ public class RundownConfig {
     private String key;
     private String host;
     private List<Integer> sportsId; // springs will auto split comma separated list
+    private String affiliateId;
 }

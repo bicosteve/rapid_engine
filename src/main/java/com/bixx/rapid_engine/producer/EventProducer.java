@@ -66,17 +66,19 @@ public class EventProducer {
         String url;
         if(deltaLastId == null){
             log.info("Producer::sport {} - no delta found, fetching all events",sportId);
-            url = "%s/sports/%s/events/%s".formatted(
-                    this.rundownConfig.getHost(),
-                    sportId,
-                    today
-            );
-        } else {
-            log.info("Producer::sport {} - delta found {}, fetching updates",sportId,deltaLastId);
-            url = "%s/sports/%s/events/%s?delta_last_id=%s".formatted(
+            url = "%s/sports/%s/events/%s?affiliate_ids=%s".formatted(
                     this.rundownConfig.getHost(),
                     sportId,
                     today,
+                    this.rundownConfig.getHost()
+            );
+        } else {
+            log.info("Producer::sport {} - delta found {}, fetching updates",sportId,deltaLastId);
+            url = "%s/sports/%s/events/%s?affiliate_ids=%s&delta_last_id=%s".formatted(
+                    this.rundownConfig.getHost(),
+                    sportId,
+                    today,
+                    this.rundownConfig.getHost(),
                     deltaLastId
             );
 
