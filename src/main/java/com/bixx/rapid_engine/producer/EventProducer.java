@@ -30,31 +30,31 @@ public class EventProducer {
     private final RabbitTemplate rabbitTemplate;
     private final RabbitMQConfig rabbitMQConfig;
     private final ObjectMapper objectMapper;
-    private final RedisTemplate<String,String> stringRedisTemplate;
+    private final RedisTemplate<String, String> stringRedisTemplate;
 
 
     public void fetchEvents(){
-       List<Integer> sportIds = this.rundownConfig.getSportsId();
-           sportIds.forEach(sportId ->{
-               try{
-                   this.fetchAndPublishEvents(sportId);
-                   Thread.sleep(2000);
-                   // wait for 2s before next request.
-                   // necessary to avoid 429 rate limit exception.
-               }catch(InterruptedException ex){
-                   Thread.currentThread().interrupt();
-                   log.error("Producer::sleep interrupted for sport {}",sportId);
-               } catch(Exception e) {
-                   log.error("Producer::error fetching sport {} with error {}",
-                           sportId,
-                           e.getMessage()
-                   );
-               }
-           });
+        List<Integer> sportIds = this.rundownConfig.getSportsId();
+        sportIds.forEach(sportId -> {
+            try {
+                this.fetchAndPublishEvents(sportId);
+                Thread.sleep(2000);
+                // wait for 2s before next request.
+                // necessary to avoid 429 rate limit exception.
+            } catch(InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                log.error("Producer::sleep interrupted for sport {}", sportId);
+            } catch(Exception e) {
+                log.error("Producer::error fetching sport {} with error {}",
+                        sportId,
+                        e.getMessage()
+                );
+            }
+        });
     }
 
 
-    private void fetchAndPublishEvents(Integer sportId) throws Exception {
+    private void fetchAndPublishEvents(Integer sportId) throws Exception{
 
         // 01. Check in Redis the last existing deltaLastId
         String redisKey = "rundown:delta_last_id:%s".formatted(sportId);
@@ -64,8 +64,8 @@ public class EventProducer {
         // 02. Build the URL
         LocalDate today = now();
         String url;
-        if(deltaLastId == null){
-            log.info("Producer::sport {} - no delta found, fetching all events",sportId);
+        if(deltaLastId == null) {
+            log.info("Producer::sport {} - no delta found, fetching all events", sportId);
             url = "%s/sports/%s/events/%s?affiliate_ids=%s".formatted(
                     this.rundownConfig.getHost(),
                     sportId,
@@ -73,7 +73,7 @@ public class EventProducer {
                     this.rundownConfig.getHost()
             );
         } else {
-            log.info("Producer::sport {} - delta found {}, fetching updates",sportId,deltaLastId);
+            log.info("Producer::sport {} - delta found {}, fetching updates", sportId, deltaLastId);
             url = "%s/sports/%s/events/%s?affiliate_ids=%s&delta_last_id=%s".formatted(
                     this.rundownConfig.getHost(),
                     sportId,
@@ -97,8 +97,13 @@ public class EventProducer {
                 String.class
         );
 
-        if(response.getStatusCode() != HttpStatus.OK){
-            log.error("Producer::sport {} - API returned {}", sportId, response.getStatusCode());
+        if(response.getStatusCode() != HttpStatus.OK) {
+            log.error(
+                    "Producer::sport {} - API returned {}",
+                    sportId,
+                    response.getStatusCode()
+            );
+
             return;
         }
 
@@ -108,8 +113,12 @@ public class EventProducer {
 
         // 06. Check for Events
         List<Event> events = rundownResponse.getEvents();
-        if(events == null || events.isEmpty()){
-            log.warn("Producer::sport {} - no events found for {}",sportId,today);
+        if(events == null || events.isEmpty()) {
+            log.warn(
+                    "Producer::sport {} - no events found for {}",
+                    sportId,
+                    today
+            );
             return;
         }
 
@@ -117,9 +126,15 @@ public class EventProducer {
         // 07. Get events & meta from response;
         Meta meta = rundownResponse.getMeta();
         String newDeltaLastId = meta.getDeltaLastId();
-        if(newDeltaLastId != null){
-            this.stringRedisTemplate.opsForValue().set(redisKey,newDeltaLastId, Duration.ofHours(24));
-            log.info("Producer::sport {} - saved new delta {}",sportId,newDeltaLastId);
+        if(newDeltaLastId != null) {
+            this.stringRedisTemplate
+                    .opsForValue()
+                    .set(redisKey, newDeltaLastId, Duration.ofHours(24));
+            log.info(
+                    "Producer::sport {} - saved new delta {}",
+                    sportId,
+                    newDeltaLastId
+            );
         }
 
 
@@ -131,6 +146,6 @@ public class EventProducer {
                     event
             );
         });
-        log.info("Producer::sport_id {} --> events {} ",sportId,events);
+        log.info("Producer::sport_id {} --> events {} ", sportId, events);
     }
 }
