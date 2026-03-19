@@ -1,24 +1,29 @@
 package com.bixx.rapid_engine.producer;
 
+import java.time.Duration;
+import java.time.LocalDate;
+import static java.time.LocalDate.now;
+import java.util.List;
+
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
+
 import com.bixx.rapid_engine.config.RundownConfig;
 import com.bixx.rapid_engine.models.Event;
 import com.bixx.rapid_engine.models.Meta;
 import com.bixx.rapid_engine.models.RundownResponse;
 import com.bixx.rapid_engine.rabbitmq.RabbitMQConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.*;
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
-
-import java.time.Duration;
-import java.time.LocalDate;
-import java.util.List;
-
-import static java.time.LocalDate.now;
 
 @Component
 @RequiredArgsConstructor
@@ -146,6 +151,6 @@ public class EventProducer {
                     event
             );
         });
-        log.info("Producer::sport_id {} --> events {} ", sportId, events);
+        log.info("Producer::sport_id {}", sportId);
     }
 }
