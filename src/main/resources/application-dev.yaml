@@ -21,8 +21,8 @@ app:
     routing-key: ${RABBITMQ_ROUTING_KEY}
 
   rundown-api:
-    # key: ${RUNDOWN_API_KEY}
-    key: ${RUNDOWN_API_KEY_M1}
+    key: ${RUNDOWN_API_KEY}
+    # key: ${RUNDOWN_API_KEY_M1}
     host: ${RUNDOWN_BASE_URL}
     sports-id: ${RUNDOWN_SPORT_IDS}
     affiliate-id: ${AFFILIATES_ID}

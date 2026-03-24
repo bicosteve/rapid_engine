@@ -37,8 +37,7 @@ public class EventProducer {
     private final ObjectMapper objectMapper;
     private final RedisTemplate<String, String> stringRedisTemplate;
 
-
-    public void fetchEvents(){
+    public void fetchEvents() {
         List<Integer> sportIds = this.rundownConfig.getSportsId();
         sportIds.forEach(sportId -> {
             try {
@@ -46,37 +45,33 @@ public class EventProducer {
                 Thread.sleep(2000);
                 // wait for 2s before next request.
                 // necessary to avoid 429 rate limit exception.
-            } catch(InterruptedException ex) {
+            } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 log.error("Producer::sleep interrupted for sport {}", sportId);
-            } catch(Exception e) {
+            } catch (Exception e) {
                 log.error("Producer::error fetching sport {} with error {}",
                         sportId,
-                        e.getMessage()
-                );
+                        e.getMessage());
             }
         });
     }
 
-
-    private void fetchAndPublishEvents(Integer sportId) throws Exception{
+    private void fetchAndPublishEvents(Integer sportId) throws Exception {
 
         // 01. Check in Redis the last existing deltaLastId
         String redisKey = "rundown:delta_last_id:%s".formatted(sportId);
         String deltaLastId = this.stringRedisTemplate.opsForValue().get(redisKey);
 
-
         // 02. Build the URL
         LocalDate today = now();
         String url;
-        if(deltaLastId == null) {
+        if (deltaLastId == null) {
             log.info("Producer::sport {} - no delta found, fetching all events", sportId);
             url = "%s/sports/%s/events/%s?affiliate_ids=%s".formatted(
                     this.rundownConfig.getHost(),
                     sportId,
                     today,
-                    this.rundownConfig.getHost()
-            );
+                    this.rundownConfig.getHost());
         } else {
             log.info("Producer::sport {} - delta found {}, fetching updates", sportId, deltaLastId);
             url = "%s/sports/%s/events/%s?affiliate_ids=%s&delta_last_id=%s".formatted(
@@ -84,8 +79,7 @@ public class EventProducer {
                     sportId,
                     today,
                     this.rundownConfig.getHost(),
-                    deltaLastId
-            );
+                    deltaLastId);
 
         }
 
@@ -99,15 +93,13 @@ public class EventProducer {
                 url,
                 HttpMethod.GET,
                 entity,
-                String.class
-        );
+                String.class);
 
-        if(response.getStatusCode() != HttpStatus.OK) {
+        if (response.getStatusCode() != HttpStatus.OK) {
             log.error(
                     "Producer::sport {} - API returned {}",
                     sportId,
-                    response.getStatusCode()
-            );
+                    response.getStatusCode());
 
             return;
         }
@@ -118,38 +110,33 @@ public class EventProducer {
 
         // 06. Check for Events
         List<Event> events = rundownResponse.getEvents();
-        if(events == null || events.isEmpty()) {
+        if (events == null || events.isEmpty()) {
             log.warn(
                     "Producer::sport {} - no events found for {}",
                     sportId,
-                    today
-            );
+                    today);
             return;
         }
 
-
-        // 07. Get events & meta from response;
+        // 07. Get events & meta from response
         Meta meta = rundownResponse.getMeta();
         String newDeltaLastId = meta.getDeltaLastId();
-        if(newDeltaLastId != null) {
+        if (newDeltaLastId != null) {
             this.stringRedisTemplate
                     .opsForValue()
                     .set(redisKey, newDeltaLastId, Duration.ofHours(24));
             log.info(
                     "Producer::sport {} - saved new delta {}",
                     sportId,
-                    newDeltaLastId
-            );
+                    newDeltaLastId);
         }
-
 
         // 08. Publish each event from the events list to RabbitMQ
         events.forEach(event -> {
             this.rabbitTemplate.convertAndSend(
                     this.rabbitMQConfig.getExchange(),
                     this.rabbitMQConfig.getRoutingKey(),
-                    event
-            );
+                    event);
         });
         log.info("Producer::sport_id {}", sportId);
     }
