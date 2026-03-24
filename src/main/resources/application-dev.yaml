@@ -7,14 +7,12 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
 
-
   rabbitmq:
     host: ${RABBITMQ_HOST}
     port: ${RABBITMQ_PORT}
     username: ${RABBITMQ_USERNAME}
     password: ${RABBITMQ_PASSWORD}
     virtual-host: /
-
 
 app:
   rabbitmq:
@@ -23,15 +21,14 @@ app:
     routing-key: ${RABBITMQ_ROUTING_KEY}
 
   rundown-api:
-    key: ${RUNDOWN_API_KEY}
+    # key: ${RUNDOWN_API_KEY}
+    key: ${RUNDOWN_API_KEY_M1}
     host: ${RUNDOWN_BASE_URL}
     sports-id: ${RUNDOWN_SPORT_IDS}
     affiliate-id: ${AFFILIATES_ID}
 
-
 server:
   port: ${APP_PORT}
-
 
 logging:
   level:
