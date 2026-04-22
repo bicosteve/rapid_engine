@@ -134,8 +134,8 @@ public class EventProducer {
         // 08. Publish each event from the events list to RabbitMQ
         events.forEach(event -> {
             this.rabbitTemplate.convertAndSend(
-                    this.rabbitMQConfig.getExchange(),
-                    this.rabbitMQConfig.getRoutingKey(),
+                    this.rabbitMQConfig.getMatches().getExchange(),
+                    this.rabbitMQConfig.getMatches().getRoutingKey(),
                     event);
         });
         log.info("Producer::sport_id {}", sportId);

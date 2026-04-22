@@ -8,7 +8,13 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "app.rabbitmq")
 public class RabbitMQConfig {
-    private String exchange;
-    private String queue;
-    private String routingKey;
+    private QueueConfig matches;
+    private QueueConfig results;
+
+    @Data
+    public static class QueueConfig{
+        private String exchange;
+        private String queue;
+        private String routingKey;
+    }
 }
