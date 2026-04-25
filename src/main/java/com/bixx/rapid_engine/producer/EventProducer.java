@@ -42,8 +42,8 @@ public class EventProducer {
         sportIds.forEach(sportId -> {
             try {
                 this.fetchAndPublishEvents(sportId);
-                Thread.sleep(2000);
-                // wait for 2s before next request.
+                Thread.sleep(3000);
+                // wait for 3s before next request.
                 // necessary to avoid 429 rate limit exception.
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
@@ -138,6 +138,7 @@ public class EventProducer {
                     this.rabbitMQConfig.getMatches().getRoutingKey(),
                     event);
         });
+
         log.info("Producer::sport_id {}", sportId);
     }
 }
