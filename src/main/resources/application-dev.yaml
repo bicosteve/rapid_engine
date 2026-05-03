@@ -16,16 +16,22 @@ spring:
 
 app:
   rabbitmq:
-    exchange: ${RABBITMQ_EXCHANGE}
-    queue: ${RABBITMQ_QUEUE}
-    routing-key: ${RABBITMQ_ROUTING_KEY}
+    matches:
+      exchange: ${RABBITMQ_MATCHES_EXCHANGE}
+      queue: ${RABBITMQ_MATCHES_QUEUE}
+      routing-key: ${RABBITMQ_MATCHES_ROUTING_KEY}
+
+    results:
+      exchange: ${RABBITMQ_RESULTS_EXCHANGE}
+      queue: ${RABBITMQ_RESULTS_QUEUE}
+      routing-key: ${RABBITMQ_RESULTS_ROUTING_KEY}
 
   rundown-api:
-    key: ${RUNDOWN_API_KEY}
-    # key: ${RUNDOWN_API_KEY_M1}
+    #    key: ${RUNDOWN_API_KEY}
+    key: ${RUNDOWN_API_KEY_M1}
     host: ${RUNDOWN_BASE_URL}
     sports-id: ${RUNDOWN_SPORT_IDS}
-    affiliate-id: ${AFFILIATES_ID}
+    affiliate-id: ${AFFILIATE_IDS}
 
 server:
   port: ${APP_PORT}

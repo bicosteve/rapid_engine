@@ -21,13 +21,13 @@ public class RabbitMQBeans {
     // 01. Declare the queue
     @Bean
     public Queue matchesQueue(){
-        return new Queue(this.rabbitMQConfig.getQueue());
+        return new Queue(this.rabbitMQConfig.getMatches().getQueue());
     }
 
     // 02. Declare the exchange
     @Bean
     public TopicExchange matchesExchange(){
-        return new TopicExchange(this.rabbitMQConfig.getExchange());
+        return new TopicExchange(this.rabbitMQConfig.getMatches().getExchange());
     }
 
     // 03. Bind the queue to exchange with routing key
@@ -39,16 +39,39 @@ public class RabbitMQBeans {
         return BindingBuilder
                 .bind(matchesQueue)
                 .to(matchesExchange)
-                .with(this.rabbitMQConfig.getRoutingKey());
+                .with(this.rabbitMQConfig.getMatches().getRoutingKey());
     }
 
-    // 04. Jackson converter - used to serailize/deserialize messages as JSON
+    // 04. Declare resultsQueue
+    @Bean
+    public Queue resultsQueue(){
+        return new Queue(this.rabbitMQConfig.getResults().getQueue());
+    }
+
+
+    // 05. Declare resultsExchange
+    @Bean
+    public TopicExchange resultsExchange(){
+        return new TopicExchange(this.rabbitMQConfig.getResults().getExchange());
+    }
+
+    // 06. Bind the resultsQueue and resultsExchange
+    @Bean
+    public Binding resultsBinding(Queue resultsQueue, TopicExchange resultsExchange){
+        return BindingBuilder
+                .bind(resultsQueue)
+                .to(resultsExchange)
+                .with(this.rabbitMQConfig.getResults().getRoutingKey());
+    }
+
+
+    // 07. Jackson converter - used to serailize/deserialize messages as JSON
     @Bean
     public MessageConverter messageConverter(ObjectMapper objectMapper){
         return new Jackson2JsonMessageConverter(objectMapper);
     }
 
-    // 05. RabbitTemplate - used by producer to send messages
+    // 08. RabbitTemplate - used by producer to send messages
     @Bean
     public RabbitTemplate rabbitTemplate(
             ConnectionFactory factory,
