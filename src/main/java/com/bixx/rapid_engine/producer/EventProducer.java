@@ -60,7 +60,7 @@ public class EventProducer {
                     this.rundownConfig.getHost(),
                     sportId,
                     today,
-                    this.rundownConfig.getHost(),
+                    this.rundownConfig.getAffiliateId(),
                     deltaLastId);
 
         }
