@@ -31,7 +31,7 @@ app:
     key: ${RUNDOWN_API_KEY_M1}
     host: ${RUNDOWN_BASE_URL}
     sports-id: ${RUNDOWN_SPORT_IDS}
-    affiliate-id: ${AFFILIATES_ID}
+    affiliate-id: ${AFFILIATE_IDS}
 
 server:
   port: ${APP_PORT}
