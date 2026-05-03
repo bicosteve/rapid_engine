@@ -36,22 +36,6 @@ public class EventProducer {
         } catch(Exception e) {
             log.error("Producer::Error fetching sport {} with error {}", sportsId, e.getMessage());
         }
-//        List<Integer> sportIds = this.rundownConfig.getSportsId();
-//        sportIds.forEach(sportId -> {
-//            try {
-//                this.fetchAndPublishEvents(sportId);
-//                Thread.sleep(3000);
-//                // wait for 3s before next request.
-//                // necessary to avoid 429 rate limit exception.
-//            } catch(InterruptedException ex) {
-//                Thread.currentThread().interrupt();
-//                log.error("Producer::sleep interrupted for sport {}", sportId);
-//            } catch(Exception e) {
-//                log.error("Producer::error fetching sport {} with error {}",
-//                        sportId,
-//                        e.getMessage());
-//            }
-//        });
     }
 
     private void fetchAndPublishEvents(Integer sportId) throws Exception{
