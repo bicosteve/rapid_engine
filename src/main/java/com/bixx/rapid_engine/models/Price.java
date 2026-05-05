@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Data
 @NoArgsConstructor
@@ -20,7 +20,8 @@ public class Price {
     @JsonProperty("is_main_line")
     private boolean isMainLine;
 
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
+    private OffsetDateTime closedAt;
 
     // Will be null but to be set by consumer at insert
     private Integer participantId;

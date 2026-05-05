@@ -3,6 +3,7 @@ package com.bixx.rapid_engine.models;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Data
@@ -13,7 +14,7 @@ public class Event {
     private String eventId;
     private String eventUuid;
     private Integer sportId;
-    private LocalDateTime eventDate;
+    private OffsetDateTime eventDate;
     private LocalDateTime createdAt; // to be set by DB in consumer
     private LocalDateTime updatedAt; // tp be set by DB in consumer
 

@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Data
 @Builder
@@ -26,5 +26,5 @@ public class Score {
     private String broadcast;
     private String venueName;
     private String venueLocation;
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
 }

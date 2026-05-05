@@ -18,7 +18,7 @@ public class MatchSyncTask {
     private int sportIndex = 0;
 
 
-    @Scheduled(fixedRate = 300_000, initialDelay = 20_000)
+    @Scheduled(fixedRate = 30_000, initialDelay = 20_000)
     public void fetchMatches(){
         // Scheduled to run after 1hr
         // delay the first call after the app start with 20s

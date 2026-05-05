@@ -32,6 +32,8 @@ app:
     host: ${RUNDOWN_BASE_URL}
     sports-id: ${RUNDOWN_SPORT_IDS}
     affiliate-id: ${AFFILIATE_IDS}
+    poll: ${POLL}
+    delay: ${DELAY}
 
 server:
   port: ${APP_PORT}
