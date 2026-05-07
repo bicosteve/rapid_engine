@@ -119,6 +119,7 @@ public class EventProducer {
                     this.rabbitMQConfig.getMatches().getExchange(),
                     this.rabbitMQConfig.getMatches().getRoutingKey(),
                     event);
+
         });
 
         log.info("Producer::sport_id {}", sportId);
