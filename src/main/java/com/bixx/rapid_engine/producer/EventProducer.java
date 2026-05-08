@@ -30,15 +30,16 @@ public class EventProducer {
     private final ObjectMapper objectMapper;
     private final RedisTemplate<String, String> stringRedisTemplate;
 
-    public void fetchEvents(Integer sportsId){
+    public int fetchEvents(Integer sportsId){
         try {
-            this.fetchAndPublishEvents(sportsId);
+            return this.fetchAndPublishEvents(sportsId);
         } catch(Exception e) {
             log.error("Producer::Error fetching sport {} with error {}", sportsId, e.getMessage());
+            return 0;
         }
     }
 
-    private void fetchAndPublishEvents(Integer sportId) throws Exception{
+    private int fetchAndPublishEvents(Integer sportId) throws Exception{
 
         // 01. Check in Redis the last existing deltaLastId
         String redisKey = "rundown:delta_last_id:%s".formatted(sportId);
@@ -83,7 +84,7 @@ public class EventProducer {
                     sportId,
                     response.getStatusCode());
 
-            return;
+            return 0;
         }
 
         // 05. Parse the response into RundownResponse.class
@@ -97,7 +98,7 @@ public class EventProducer {
                     "Producer::sport {} - no events found for {}",
                     sportId,
                     today);
-            return;
+            return 0;
         }
 
         // 07. Get events & meta from response
@@ -123,5 +124,7 @@ public class EventProducer {
         });
 
         log.info("Producer::sport_id {}", sportId);
+
+        return events.size();
     }
 }
