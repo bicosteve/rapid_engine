@@ -34,7 +34,7 @@ public class EventProducer {
         try {
             return this.fetchAndPublishEvents(sportsId);
         } catch(Exception e) {
-            log.error("Producer::Error fetching sport {} with error {}", sportsId, e.getMessage());
+            log.error("Error fetching sport {} with error {}", sportsId, e.getMessage());
             return 0;
         }
     }
@@ -49,14 +49,14 @@ public class EventProducer {
         LocalDate today = LocalDate.now();
         String url;
         if(deltaLastId == null) {
-            log.info("Producer::sport {} - no delta found, fetching all events", sportId);
+            log.info("No delta found for {}. Fetching the events data", sportId);
             url = "%s/sports/%s/events/%s?affiliate_ids=%s".formatted(
                     this.rundownConfig.getHost(),
                     sportId,
                     today,
                     this.rundownConfig.getAffiliateId());
         } else {
-            log.info("Producer::sport {} - delta found {}, fetching updates", sportId, deltaLastId);
+            log.info("Delta {} found for sportId {}, fetching updates", sportId, deltaLastId);
             url = "%s/sports/%s/events/%s?affiliate_ids=%s&delta_last_id=%s".formatted(
                     this.rundownConfig.getHost(),
                     sportId,
@@ -79,8 +79,7 @@ public class EventProducer {
                 String.class);
 
         if(response.getStatusCode() != HttpStatus.OK) {
-            log.error(
-                    "Producer::sport {} - API returned {}",
+            log.error("Sport Id {} - API returned {}",
                     sportId,
                     response.getStatusCode());
 
@@ -95,9 +94,9 @@ public class EventProducer {
         List<Event> events = rundownResponse.getEvents();
         if(events == null || events.isEmpty()) {
             log.warn(
-                    "Producer::sport {} - no events found for {}",
-                    sportId,
-                    today);
+                    "Date {}  - no events found for sportId {}",
+                    today,
+                    sportId);
             return 0;
         }
 
@@ -108,8 +107,9 @@ public class EventProducer {
             this.stringRedisTemplate
                     .opsForValue()
                     .set(redisKey, newDeltaLastId, Duration.ofHours(24));
+
             log.info(
-                    "Producer::sport {} - saved new delta {}",
+                    "Sport Id {} - saved new delta {}",
                     sportId,
                     newDeltaLastId);
         }
@@ -122,8 +122,6 @@ public class EventProducer {
                     event);
 
         });
-
-        log.info("Producer::sport_id {}", sportId);
 
         return events.size();
     }

@@ -37,15 +37,15 @@ public class MatchSyncTask {
 
         // 02. Check for daily budget before fetching
         if(this.isBudgetExhausted()) {
-            log.warn("Scheduler:: daily budgeted data points exhausted. Skip fetch");
+            log.warn("Daily budgeted data points exhausted. Skip fetch");
             return;
         }
 
         // 03. Get the current sport ID and increment the index value for the next time
         Integer sportId = sportIds.get(this.sportIndex);
-        log.info("Scheduler::Cycling to sport id {} ", sportId);
+        log.info("Cycling to sport id {} ", sportId);
 
-        log.info("Scheduler::triggering match producer");
+        log.info("Triggering match producer");
         int publishedEvent = this.eventProducer.fetchEvents(sportId);
 
         // 04. Track estimated data points used
@@ -65,7 +65,7 @@ public class MatchSyncTask {
             return false;
 
         int used = Integer.parseInt(usage);
-        log.info("Scheduler::daily data points used {}/{} ", used, DAILY_DATA_POINT_BUDGET);
+        log.info("Daily data points used {}/{} ", used, DAILY_DATA_POINT_BUDGET);
 
         return used >= DAILY_DATA_POINT_BUDGET;
     }
@@ -82,7 +82,7 @@ public class MatchSyncTask {
         this.stringRedisTemplate.expire(usageKey, Duration.ofSeconds(24));
 
         log.info(
-                "Scheduler::estimated {} data points used for {} events ",
+                "Estimated {} data points used for {} events ",
                 pointsUsed,
                 eventsPublished
         );

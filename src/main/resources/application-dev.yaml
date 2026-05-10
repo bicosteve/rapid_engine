@@ -39,5 +39,9 @@ server:
   port: ${APP_PORT}
 
 logging:
+  config: classpath:rapid-engine-logback.xml
   level:
+    root: INFO
+    com.bixx.rapid_engine: INFO
+    org.apache.coyote: INFO
     org.springframework.jdbc: ${LOGGING_LEVEL}
