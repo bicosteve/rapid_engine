@@ -8,8 +8,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
@@ -21,13 +19,10 @@ public class MatchSyncTask {
     private final StringRedisTemplate stringRedisTemplate;
     private int sportIndex = 0;
 
-    private static final int DAILY_DATA_POINT_BUDGET = 20_000;
-    private static final int ESTIMATED_POINTS_PER_FETCH = 750;
 
-
-    @Scheduled(fixedRate = 500_000, initialDelay = 20_000)
+    @Scheduled(fixedRate = 300_000, initialDelay = 20_000)
     public void fetchMatches(){
-        // Scheduled to run after 1hr
+        // Scheduled to run after 5mins
         // delay the first call after the app start with 20s
 
         // 01. Check for the sportsId provided in the config
@@ -35,64 +30,17 @@ public class MatchSyncTask {
         if(sportIds == null || sportIds.isEmpty())
             return;
 
-        // 02. Check for daily budget before fetching
-        if(this.isBudgetExhausted()) {
-            log.warn("Scheduler:: daily budgeted data points exhausted. Skip fetch");
-            return;
-        }
-
-        // 03. Get the current sport ID and increment the index value for the next time
+        // 02. Get the current sport IDs
+        // and increment the index value for the next time
         Integer sportId = sportIds.get(this.sportIndex);
-        log.info("Scheduler::Cycling to sport id {} ", sportId);
+        log.info("Cycling to sport id {} ", sportId);
 
-        log.info("Scheduler::triggering match producer");
-        int publishedEvent = this.eventProducer.fetchEvents(sportId);
+        // 03. Track published events
+        log.info("Trigger match producer");
+        int publishedEvents = this.eventProducer.fetchEvents(sportId);
+        log.info("Published events {} ", publishedEvents);
 
-        // 04. Track estimated data points used
-        if(publishedEvent > 0) {
-            this.trackDataPointUsed(publishedEvent);
-        }
-
-        // 05. Use Round-robin logic
+        // 04. Use Round-robin logic
         sportIndex = (sportIndex + 1) % sportIds.size();
-    }
-
-    private boolean isBudgetExhausted(){
-        String usageKey = this.getDailyUsageKey();
-        String usage = this.stringRedisTemplate.opsForValue().get(usageKey);
-
-        if(usage == null)
-            return false;
-
-        int used = Integer.parseInt(usage);
-        log.info("Scheduler::daily data points used {}/{} ", used, DAILY_DATA_POINT_BUDGET);
-
-        return used >= DAILY_DATA_POINT_BUDGET;
-    }
-
-    private void trackDataPointUsed(int eventsPublished){
-        // Estimates the data points used
-        // each event has at most 3 markets,
-        int pointsUsed = eventsPublished * ESTIMATED_POINTS_PER_FETCH;
-
-        String usageKey = this.getDailyUsageKey();
-
-        // Increment counter - expire after 24hours
-        this.stringRedisTemplate.opsForValue().increment(usageKey, pointsUsed);
-        this.stringRedisTemplate.expire(usageKey, Duration.ofSeconds(24));
-
-        log.info(
-                "Scheduler::estimated {} data points used for {} events ",
-                pointsUsed,
-                eventsPublished
-        );
-
-    }
-
-
-    private String getDailyUsageKey(){
-        // gets the dailyUsageKey
-        // key resets daily - includes today's date
-        return "rundown:data_points:%s".formatted(LocalDateTime.now());
     }
 }

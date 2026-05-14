@@ -14,6 +14,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
@@ -34,44 +35,65 @@ public class EventProducer {
         try {
             return this.fetchAndPublishEvents(sportsId);
         } catch(Exception e) {
-            log.error("Producer::Error fetching sport {} with error {}", sportsId, e.getMessage());
+            log.error("Error fetching sport {} with error {}", sportsId, e.getMessage());
             return 0;
         }
     }
 
     private int fetchAndPublishEvents(Integer sportId) throws Exception{
+        // 02. Build the URL
+        // LocalDate.now(Clock.systemUTC())
+        LocalDate today = LocalDate.now(Clock.systemUTC());
+        int totalEvents = 0;
 
+        // Yesterday's Games
+        totalEvents += this.fetchEventsForADate(sportId, today.minusDays(1));
+
+        Thread.sleep(1200); // Wait for a second
+
+        // Today's Games
+        totalEvents += this.fetchEventsForADate(sportId, today);
+
+        Thread.sleep(1200);
+
+        // Tomorrow's Games
+        totalEvents += this.fetchEventsForADate(sportId, today.plusDays(1));
+
+        return totalEvents;
+
+    }
+
+
+    private int fetchEventsForADate(Integer sportsId, LocalDate eventDate) throws Exception{
         // 01. Check in Redis the last existing deltaLastId
-        String redisKey = "rundown:delta_last_id:%s".formatted(sportId);
+        String redisKey = "rundown:delta_last_id:%s".formatted(sportsId);
         String deltaLastId = this.stringRedisTemplate.opsForValue().get(redisKey);
 
-        // 02. Build the URL
-        LocalDate today = LocalDate.now();
         String url;
         if(deltaLastId == null) {
-            log.info("Producer::sport {} - no delta found, fetching all events", sportId);
+            log.info("No delta found for {}. Fetching the events data", sportsId);
             url = "%s/sports/%s/events/%s?affiliate_ids=%s".formatted(
                     this.rundownConfig.getHost(),
-                    sportId,
-                    today,
+                    sportsId,
+                    eventDate,
                     this.rundownConfig.getAffiliateId());
         } else {
-            log.info("Producer::sport {} - delta found {}, fetching updates", sportId, deltaLastId);
+            log.info("Delta {} found for sportId {}, fetching updates", deltaLastId, sportsId);
             url = "%s/sports/%s/events/%s?affiliate_ids=%s&delta_last_id=%s".formatted(
                     this.rundownConfig.getHost(),
-                    sportId,
-                    today,
+                    sportsId,
+                    eventDate,
                     this.rundownConfig.getAffiliateId(),
                     deltaLastId);
 
         }
 
-        // 03. Set headers
+        // 02. Set headers
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-TheRundown-Key", this.rundownConfig.getKey());
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        // 04. Make the api call
+        // 03. Make the api call
         ResponseEntity<String> response = this.restTemplate.exchange(
                 url,
                 HttpMethod.GET,
@@ -79,42 +101,42 @@ public class EventProducer {
                 String.class);
 
         if(response.getStatusCode() != HttpStatus.OK) {
-            log.error(
-                    "Producer::sport {} - API returned {}",
-                    sportId,
+            log.error("Sport Id {} - API returned {}",
+                    sportsId,
                     response.getStatusCode());
 
             return 0;
         }
 
-        // 05. Parse the response into RundownResponse.class
+        // 04. Parse the response into RundownResponse.class
         RundownResponse rundownResponse = this.objectMapper
                 .readValue(response.getBody(), RundownResponse.class);
 
-        // 06. Check for Events
+        // 05. Check for Events
         List<Event> events = rundownResponse.getEvents();
         if(events == null || events.isEmpty()) {
             log.warn(
-                    "Producer::sport {} - no events found for {}",
-                    sportId,
-                    today);
+                    "Date {}  - no events found for sportId {}",
+                    eventDate,
+                    sportsId);
             return 0;
         }
 
-        // 07. Get events & meta from response
+        // 06. Get events & meta from response
         Meta meta = rundownResponse.getMeta();
         String newDeltaLastId = meta.getDeltaLastId();
         if(newDeltaLastId != null) {
             this.stringRedisTemplate
                     .opsForValue()
                     .set(redisKey, newDeltaLastId, Duration.ofHours(24));
+
             log.info(
-                    "Producer::sport {} - saved new delta {}",
-                    sportId,
+                    "Sport Id {} - saved new delta {}",
+                    sportsId,
                     newDeltaLastId);
         }
 
-        // 08. Publish each event from the events list to RabbitMQ
+        // 07. Publish each event from the events list to RabbitMQ
         events.forEach(event -> {
             this.rabbitTemplate.convertAndSend(
                     this.rabbitMQConfig.getMatches().getExchange(),
@@ -122,8 +144,6 @@ public class EventProducer {
                     event);
 
         });
-
-        log.info("Producer::sport_id {}", sportId);
 
         return events.size();
     }
