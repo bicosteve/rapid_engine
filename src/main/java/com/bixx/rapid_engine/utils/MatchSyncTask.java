@@ -21,13 +21,10 @@ public class MatchSyncTask {
     private final StringRedisTemplate stringRedisTemplate;
     private int sportIndex = 0;
 
-    private static final int DAILY_DATA_POINT_BUDGET = 20_000;
-    private static final int ESTIMATED_POINTS_PER_FETCH = 750;
 
-
-    @Scheduled(fixedRate = 500_000, initialDelay = 20_000)
+    @Scheduled(fixedRate = 300_000, initialDelay = 20_000)
     public void fetchMatches(){
-        // Scheduled to run after 1hr
+        // Scheduled to run after 10mins
         // delay the first call after the app start with 20s
 
         // 01. Check for the sportsId provided in the config
@@ -35,23 +32,16 @@ public class MatchSyncTask {
         if(sportIds == null || sportIds.isEmpty())
             return;
 
-        // 02. Check for daily budget before fetching
-        if(this.isBudgetExhausted()) {
-            log.warn("Daily budgeted data points exhausted. Skip fetch");
-            return;
-        }
-
-        // 03. Get the current sport ID and increment the index value for the next time
+        // 02. Get the current sport IDs
+        // and increment the index value for the next time
         Integer sportId = sportIds.get(this.sportIndex);
         log.info("Cycling to sport id {} ", sportId);
 
         log.info("Triggering match producer");
-        int publishedEvent = this.eventProducer.fetchEvents(sportId);
+        int publishedEvents = this.eventProducer.fetchEvents(sportId);
 
-        // 04. Track estimated data points used
-        if(publishedEvent > 0) {
-            this.trackDataPointUsed(publishedEvent);
-        }
+        // 04. Track published events
+        log.info("Published events {} ", publishedEvents);
 
         // 05. Use Round-robin logic
         sportIndex = (sportIndex + 1) % sportIds.size();
