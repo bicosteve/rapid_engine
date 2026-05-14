@@ -6,6 +6,7 @@
     <property name="LOG_FILE" value="${LOG_PATH}/${APP_NAME}"/>
     <property name="MAX_HISTORY" value="30"/> <!--keep for 30 days-->
     <property name="MAX_SIZE" value="50MB"/>
+    <property name="TOTAL_SIZE_CAP" value="500MB"/>
 
     <!--Set Log Patterns for Console & File -->
     <property
@@ -15,7 +16,7 @@
 
     <property
             name="FILE_PATTERN"
-            value="%d{yyyy-MM-dd HH:mm:ss} | %-5level | %logger{25} | %X{traceId} | %X{profileId} | %msg%n"
+            value="%d{yyyy-MM-dd HH:mm:ss} | %-5level | %logger{25} | %X{traceId} | %msg%n"
     />
 
     <!--Console Appender-->
@@ -33,10 +34,10 @@
         <rollingPolicy
                 class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- rotate daily - filename - date -->
-            <fileNamePattern>${LOG_FILE}.%d{dd-MM-yyyy}.log</fileNamePattern>
+            <fileNamePattern>${LOG_FILE}.%d{dd-MM-yyyy}.%i.log</fileNamePattern>
             <maxHistory>${MAX_HISTORY}</maxHistory>
             <!--Total log size cap-->
-            <totalSizeCap>500MB</totalSizeCap>
+            <totalSizeCap>${TOTAL_SIZE_CAP}</totalSizeCap>
         </rollingPolicy>
         <encoder>
             <pattern>${FILE_PATTERN}</pattern>
@@ -53,7 +54,7 @@
         </filter>
         <rollingPolicy
                 class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_FILE}-error.%d{dd-MM-yyyy}.log
+            <fileNamePattern>${LOG_FILE}-error.%d{dd-MM-yyyy}.%i.log
             </fileNamePattern>
             <maxHistory>${MAX_HISTORY}</maxHistory>
             <totalSizeCap>100MB</totalSizeCap>
@@ -66,14 +67,22 @@
     <!-- ASYNC WRAPPER — non-blocking file writes     -->
     <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
         <appender-ref ref="FILE_ALL"/>
+
+        <!--Queue size before blocking-->
         <queueSize>512</queueSize>
-        <discardingThreshold>0</discardingThreshold>
+
+        <!--Discard low-priority logs when the queue is almost full.-->
+        <discardingThreshold>20</discardingThreshold>
     </appender>
 
     <appender name="ASYNC_ERROR" class="ch.qos.logback.classic.AsyncAppender">
         <appender-ref ref="FILE_ERROR"/>
+
+        <!--Queue size before blocking-->
         <queueSize>256</queueSize>
-        <discardingThreshold>0</discardingThreshold>
+
+        <!--Discard low-priority logs when the queue is almost full.-->
+        <discardingThreshold>20</discardingThreshold>
     </appender>
 
     <!-- ─────────────────────────────────────────── -->
@@ -87,29 +96,37 @@
         <appender-ref ref="ASYNC_ERROR"/>
     </logger>
 
-    <!-- Spring framework — reduce noise -->
+    <!-- Spring framework — reduces Spring framework noise -->
     <logger name="org.springframework" level="WARN"/>
+
+    <!--- Show SQL/JDBC related info -->
     <logger name="org.springframework.jdbc" level="INFO"/>
 
-    <!-- HikariCP connection pool -->
+    <!-- Hikari connection pool -->
     <logger name="com.zaxxer.hikari" level="WARN"/>
 
     <!-- RabbitMQ -->
     <logger name="org.springframework.amqp" level="WARN"/>
 
+
+    <!-- Default root logger
+    safe fallback logger if no profiles matches.
+    console only
+    -->
+
     <!-- Root Logger -->
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="ASYNC_FILE"/>
-        <appender-ref ref="ASYNC_ERROR"/>
     </root>
 
 
     <!-- Spring Profiles  -->
     <springProfile name="dev">
+        <!--rapid-engine logs on dev profile -->
         <logger name="com.bixx.rapid_engine" level="DEBUG" additivity="false">
             <appender-ref ref="CONSOLE"/>
         </logger>
+
         <root level="DEBUG">
             <appender-ref ref="CONSOLE"/>
         </root>
@@ -117,10 +134,14 @@
 
     <springProfile name="prod">
         <logger name="com.bixx.rapid_engine" level="INFO" additivity="false">
+
             <appender-ref ref="CONSOLE"/>
+
             <appender-ref ref="ASYNC_FILE"/>
+
             <appender-ref ref="ASYNC_ERROR"/>
         </logger>
+
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_FILE"/>
