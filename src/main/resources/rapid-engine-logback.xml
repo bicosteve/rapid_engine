@@ -28,15 +28,17 @@
 
 
     <!-- Daily Rolling File Appender for ALL LOGS -->
-    <appender name="FILE_ALL"
-              class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <appender name="FILE_ALL" class="ch.qos.logback.core.rolling.RollingFileAppender">
 
         <file>${LOG_FILE}.log</file>
 
-        <rollingPolicy
-                class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <!-- rotate daily - filename - date -->
             <fileNamePattern>${LOG_FILE}.%d{dd-MM-yyyy}.%i.log</fileNamePattern>
+
+            <!-- Max file size -->
+            <maxFileSize>${MAX_SIZE}</maxFileSize>
+
             <maxHistory>${MAX_HISTORY}</maxHistory>
             <!--Total log size cap-->
             <totalSizeCap>${TOTAL_SIZE_CAP}</totalSizeCap>
@@ -50,22 +52,29 @@
 
 
     <!-- Daily Rolling File Appender  — ERRORS ONLY   -->
-    <appender name="FILE_ERROR"
-              class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <appender name="FILE_ERROR" class="ch.qos.logback.core.rolling.RollingFileAppender">
+
         <file>${LOG_FILE}-error.log</file>
+
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>ERROR</level>
         </filter>
-        <rollingPolicy
-                class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_FILE}-error.%d{dd-MM-yyyy}.%i.log
-            </fileNamePattern>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}-error.%d{dd-MM-yyyy}.%i.log</fileNamePattern>
+
+            <!-- Max file size -->
+            <maxFileSize>${MAX_SIZE}</maxFileSize>
+
             <maxHistory>${MAX_HISTORY}</maxHistory>
+
             <totalSizeCap>100MB</totalSizeCap>
         </rollingPolicy>
+
         <encoder>
             <pattern>${FILE_PATTERN}</pattern>
         </encoder>
+
     </appender>
 
     <!-- ASYNC WRAPPER — non-blocking file writes     -->
