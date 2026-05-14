@@ -30,18 +30,22 @@
     <!-- Daily Rolling File Appender for ALL LOGS -->
     <appender name="FILE_ALL"
               class="ch.qos.logback.core.rolling.RollingFileAppender">
+
         <file>${LOG_FILE}.log</file>
+
         <rollingPolicy
-                class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <!-- rotate daily - filename - date -->
             <fileNamePattern>${LOG_FILE}.%d{dd-MM-yyyy}.%i.log</fileNamePattern>
             <maxHistory>${MAX_HISTORY}</maxHistory>
             <!--Total log size cap-->
             <totalSizeCap>${TOTAL_SIZE_CAP}</totalSizeCap>
         </rollingPolicy>
+
         <encoder>
             <pattern>${FILE_PATTERN}</pattern>
         </encoder>
+
     </appender>
 
 
