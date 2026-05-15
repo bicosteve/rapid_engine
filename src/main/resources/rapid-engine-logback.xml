@@ -28,11 +28,13 @@
 
 
     <!-- Daily Rolling File Appender for ALL LOGS -->
-    <appender name="FILE_ALL" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <appender name="FILE_ALL"
+              class="ch.qos.logback.core.rolling.RollingFileAppender">
 
         <file>${LOG_FILE}.log</file>
 
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <rollingPolicy
+                class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <!-- rotate daily - filename - date -->
             <fileNamePattern>${LOG_FILE}.%d{dd-MM-yyyy}.%i.log</fileNamePattern>
 
@@ -52,7 +54,8 @@
 
 
     <!-- Daily Rolling File Appender  — ERRORS ONLY   -->
-    <appender name="FILE_ERROR" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <appender name="FILE_ERROR"
+              class="ch.qos.logback.core.rolling.RollingFileAppender">
 
         <file>${LOG_FILE}-error.log</file>
 
@@ -60,8 +63,10 @@
             <level>ERROR</level>
         </filter>
 
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_FILE}-error.%d{dd-MM-yyyy}.%i.log</fileNamePattern>
+        <rollingPolicy
+                class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}-error.%d{dd-MM-yyyy}.%i.log
+            </fileNamePattern>
 
             <!-- Max file size -->
             <maxFileSize>${MAX_SIZE}</maxFileSize>
@@ -102,12 +107,12 @@
     <!-- LOGGER LEVELS                                -->
     <!-- ─────────────────────────────────────────── -->
 
-    <!-- App packages — DEBUG in dev, INFO in prod -->
-    <logger name="com.bixx.rapid_engine" level="INFO" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="ASYNC_FILE"/>
-        <appender-ref ref="ASYNC_ERROR"/>
-    </logger>
+    <!--    &lt;!&ndash; App packages — DEBUG in dev, INFO in prod &ndash;&gt;-->
+    <!--    <logger name="com.bixx.rapid_engine" level="INFO" additivity="false">-->
+    <!--        <appender-ref ref="CONSOLE"/>-->
+    <!--        <appender-ref ref="ASYNC_FILE"/>-->
+    <!--        <appender-ref ref="ASYNC_ERROR"/>-->
+    <!--    </logger>-->
 
     <!-- Spring framework — reduces Spring framework noise -->
     <logger name="org.springframework" level="WARN"/>
@@ -122,44 +127,36 @@
     <logger name="org.springframework.amqp" level="WARN"/>
 
 
-    <!-- Default root logger
-    safe fallback logger if no profiles matches.
-    console only
-    -->
-
-    <!-- Root Logger -->
-    <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
-    </root>
-
-
     <!-- Spring Profiles  -->
     <springProfile name="dev">
+        <!--For dev profile, log to console only-->
+        <root level="DEBUG">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+
         <!--rapid-engine logs on dev profile -->
         <logger name="com.bixx.rapid_engine" level="DEBUG" additivity="false">
             <appender-ref ref="CONSOLE"/>
         </logger>
 
-        <root level="DEBUG">
-            <appender-ref ref="CONSOLE"/>
-        </root>
+
     </springProfile>
 
     <springProfile name="prod">
-        <logger name="com.bixx.rapid_engine" level="INFO" additivity="false">
-
-            <appender-ref ref="CONSOLE"/>
-
-            <appender-ref ref="ASYNC_FILE"/>
-
-            <appender-ref ref="ASYNC_ERROR"/>
-        </logger>
-
+        <!--For prod profile log to file and error -->
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="ASYNC_FILE"/>
             <appender-ref ref="ASYNC_ERROR"/>
         </root>
+
+        <logger name="com.bixx.rapid_engine" level="INFO" additivity="false">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ASYNC_ERROR"/>
+        </logger>
+
+
     </springProfile>
 
 </configuration>
