@@ -57,7 +57,8 @@ public class EventProducer {
         Thread.sleep(1200);
 
         // Tomorrow's Games
-        totalEvents += this.fetchEventsForADate(sportId, today.plusDays(1));
+        // upcoming games but tokens not enough
+        // totalEvents += this.fetchEventsForADate(sportId, today.plusDays(1));
 
         return totalEvents;
 
