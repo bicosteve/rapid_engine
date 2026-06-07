@@ -3,3 +3,6 @@ run:
 
 install:
 	mvn clean install
+
+tests:
+	./mvnw test
