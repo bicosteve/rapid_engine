@@ -21,6 +21,7 @@ target/
 
 ### App
 .env
+.env.docker
 
 ### NetBeans ###
 /nbproject/private/

@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    env_file:
+      - .env.docker
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    healthcheck:
+      test: [ "CMD","rabbitmq-diagnostics","ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rapid-engine-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: [ "CMD","redis-cli","ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rapid-engine-net
+
+  rapid-engine:
+    container_name: rapid-engine
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env.docker
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - rapid-engine-net
+
+networks:
+  rapid-engine-net:
+    driver: bridge
+
+
+
+

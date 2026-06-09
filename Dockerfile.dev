@@ -3,6 +3,10 @@ FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /app
 
+RUN useradd -r -u 1001 appusr \
+    && mkdir -p /app/logs \
+    && chown -R appusr:appusr /app
+
 # Copy the dependency files first !important for caching dependencies
 COPY pom.xml .
 COPY .mvn .mvn
@@ -28,8 +32,8 @@ WORKDIR /app
 
 COPY --from=builder /app/target/*.jar rapid-engine.jar
 
-RUN useradd -r -u 1001 appusr && chown appusr:appusr rapid-engine.jar
+USER appusr
 
 ENV JAVA_OPTS=""
 
-ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar rapid-engine.jar"]
+ENTRYPOINT ["sh","-c","exec java $JAVA_OPTS -jar rapid-engine.jar"]

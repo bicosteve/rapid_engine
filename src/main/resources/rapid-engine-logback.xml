@@ -2,7 +2,7 @@
 <configuration>
     <!-- Properties-->
     <property name="APP_NAME" value="rapid-engine"/>
-    <property name="LOG_PATH" value="logs"/>
+    <property name="LOG_PATH" value="${LOG_PATH}"/>
     <property name="LOG_FILE" value="${LOG_PATH}/${APP_NAME}"/>
     <property name="MAX_HISTORY" value="30"/> <!--keep for 30 days-->
     <property name="MAX_SIZE" value="50MB"/>
