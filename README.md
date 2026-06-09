@@ -60,9 +60,6 @@ The fetched events are then serialized with Jackson and dispatched onto
 **RabbitMQ topic exchange**, decoupling ingestion from the consumers that
 persist the events.
 
-> The service is intentionally **headless** (no HTTP controllers of its own) —
-> it is a worker, not an API. All output flows through RabbitMQ.
-
 ---
 
 ## Key Features
@@ -93,7 +90,7 @@ persist the events.
                                │  HTTPS (delta + events)
                                ▼
        ┌──────────────────────────────────────────────┐
-       │              Rapid Engine (this app)         │
+       │              Rapid Engine                    │
        │                                              │
        │  ┌──────────────────┐   ┌──────────────────┐ │
        │  │  MatchSyncTask   │──▶│  EventProducer   │ │
@@ -121,8 +118,8 @@ persist the events.
                           ▼                               ▼
                 ┌──────────────────┐           ┌──────────────────┐
                 │  matches.queue   │           │ results.queue    │
-                │  (downstream DB, │           │  (settlement,    │
-                │   pricing svc)   │           │   analytics)     │
+                │  (downstream DB) │           │  (settlement)    │
+                │                  │           │                  │
                 └──────────────────┘           └──────────────────┘
 ```
 
@@ -135,7 +132,7 @@ persist the events.
 4. It calls The Rundown API for *yesterday*, *today*, and *(optionally)*
    *tomorrow*.
 5. The response is deserialized into a `RundownResponse` of `Event` aggregates (
-   each carrying its `Score`, `Team[]`, `Market[]`, etc.).
+   each carrying its `Scores`, `Teams[]`, `Markets[]`, and `Prices`).
 6. Each `Event` is JSON-serialized and published to the **`matches`** topic
    exchange.
 7. The new `delta_last_id` is written back to Redis (TTL: 24h).
