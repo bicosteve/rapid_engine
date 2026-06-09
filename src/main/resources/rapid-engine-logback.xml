@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <configuration>
     <!-- Properties-->
+    <springProperty name="LOG_PATH" source="log.path" defaultValue="logs"/>
     <property name="APP_NAME" value="rapid-engine"/>
-    <property name="LOG_PATH" value="${LOG_PATH}"/>
+    <!--    <property name="LOG_PATH" value="${LOG_PATH}"/>-->
     <property name="LOG_FILE" value="${LOG_PATH}/${APP_NAME}"/>
     <property name="MAX_HISTORY" value="30"/> <!--keep for 30 days-->
     <property name="MAX_SIZE" value="50MB"/>
@@ -90,7 +91,7 @@
         <queueSize>512</queueSize>
 
         <!--Discard low-priority logs when the queue is almost full.-->
-        <discardingThreshold>20</discardingThreshold>
+        <discardingThreshold>0</discardingThreshold>
     </appender>
 
     <appender name="ASYNC_ERROR" class="ch.qos.logback.classic.AsyncAppender">
@@ -100,7 +101,7 @@
         <queueSize>256</queueSize>
 
         <!--Discard low-priority logs when the queue is almost full.-->
-        <discardingThreshold>20</discardingThreshold>
+        <discardingThreshold>0</discardingThreshold>
     </appender>
 
     <!-- ─────────────────────────────────────────── -->
