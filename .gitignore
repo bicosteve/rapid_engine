@@ -42,3 +42,4 @@ build/
 # Terraform
 /infra/.terraform
 /infra/*.tfvars
+/infra/terraform/*.tfstate*

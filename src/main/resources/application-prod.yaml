@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: rapid-engine
+
+  data:
+    redis:
+      # Upstash uses Redis 6+ ACL — the username is always "default".
+      username: ${REDIS_USERNAME:default}
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:true}
+      # Give Upstash time for the 3 way handshake since that can be slower
+      timeout: ${REDIS_TIMEOUT:10000}
+
+
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    virtual-host: ${RABBITMQ_VHOST:/}
+
+
+app:
+  rabbitmq:
+    matches:
+      exchange: ${RABBITMQ_MATCHES_EXCHANGE}
+      queue: ${RABBITMQ_MATCHES_QUEUE}
+      routing-key: ${RABBITMQ_MATCHES_ROUTING_KEY}
+
+    results:
+      exchange: ${RABBITMQ_RESULTS_EXCHANGE}
+      queue: ${RABBITMQ_RESULTS_QUEUE}
+      routing-key: ${RABBITMQ_RESULTS_ROUTING_KEY}
+
+  rundown-api:
+    key: ${RUNDOWN_API_KEY}
+    host: ${RUNDOWN_BASE_URL}
+    sports-id: ${RUNDOWN_SPORT_IDS}
+    affiliate-id: ${AFFILIATE_IDS}
+    poll: ${POLL}
+    delay: ${DELAY}
+
+server:
+  # Render injects $PORT; the Dockerfile also passes -Dserver.port=$PORT
+  # (which takes precedence over this value). Falls back to APP_PORT, then 5002.
+  port: ${PORT:${APP_PORT:5002}}
+
+
+logging:
+  config: classpath:rapid-engine-logback.xml
+  level:
+    root: INFO
+    com.bixx.rapid_engine: ${LOGGING_LEVEL:INFO}
+    org.apache.coyote: INFO
+    org.springframework.jdbc: ${LOGGING_LEVEL:INFO}
+
+log:
+  path: ${LOG_PATH:logs}
