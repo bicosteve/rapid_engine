@@ -45,3 +45,6 @@ logging:
     com.bixx.rapid_engine: INFO
     org.apache.coyote: INFO
     org.springframework.jdbc: ${LOGGING_LEVEL}
+
+log:
+  path: ${LOG_PATH}
