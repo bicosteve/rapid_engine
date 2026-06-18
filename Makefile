@@ -19,3 +19,12 @@ logs:
 down:
 	docker compose down
 
+# ==== Terraform ====
+init:
+	cd infra && terraform init
+
+plan:
+	cd infra && terraform plan
+
+apply:
+	cd infra && terraform apply
