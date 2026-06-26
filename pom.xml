@@ -77,7 +77,15 @@
 			<scope>compile</scope>
 		</dependency>
 
+		<!-- Structured JSON logging for stdout (shipped to Grafana Cloud Loki) -->
+		<dependency>
+			<groupId>net.logstash.logback</groupId>
+			<artifactId>logstash-logback-encoder</artifactId>
+			<version>7.4</version>
+		</dependency>
+
 	</dependencies>
+
 
 	<build>
 		<plugins>

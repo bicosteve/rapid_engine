@@ -1,28 +1,29 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: Workflow for testing, validating, building, and publishing.
 
 on:
   push:
     branches:
-      - main
-      - dev
       - feat/*
       - fix/*
+      - main
   pull_request:
     branches:
       - main
-      - dev
+  # Dispatch will be triggered when the image is pushed to docker successfully.
+  workflow_dispatch:
 
 env:
   JAVA_VERSION: '21'
+
   MAVEN_OPTS: '-Xmx1024m'
   DOCKER_IMAGE: bixoloo/rapid-engine
 
 jobs:
-  # STAGE::01 Tests (run unit tests, enforce 85% pass-rate gate)
+  # STAGE::01 Tests (run unit tests, enforce 100% pass-rate gate)
   test:
-    name: Stage 1 — Tests
+    name: Stage 1::Run unittests
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,7 +38,7 @@ jobs:
       - name: Run unit tests
         run: ./mvnw -B test
 
-      - name: Validate test pass-rate (>= 85%)
+      - name: Validate test pass-rate (>= 99%)
         if: always()
         shell: bash
         run: |
@@ -101,7 +102,7 @@ jobs:
 
   # STAGE::02 Build (package the application jar)
   build:
-    name: Stage 2 — Build
+    name: Stage 2::Build  the app jar file
     runs-on: ubuntu-latest
     needs: test
 
@@ -130,11 +131,11 @@ jobs:
         with:
           name: rapid-engine-jar
           path: target/*.jar
-          retention-days: 14
+          retention-days: 2
 
   # STAGE::03 Docker Build (build the production image, export it as an artifact)
   docker-build:
-    name: Build the Docker image
+    name: Stage 3::Build the application image
     runs-on: ubuntu-latest
     needs: build
 
@@ -164,14 +165,12 @@ jobs:
           path: /tmp/rapid-engine-image.tar
           retention-days: 1
 
-  # STAGE::04 Docker Push (loads the built image and push to Docker Hub)
-  # Runs only on pushes to the main branch so PRs never publish images.
   docker-push:
-    name: Stage 4 — Push to Docker Hub
+    name: Stage 4::Push the image to Docker Hub
     runs-on: ubuntu-latest
     needs: docker-build
+    # Runs only on pushes to the main branch so PRs never publish images.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
     steps:
       - name: Download image artifact
         uses: actions/download-artifact@v4
@@ -206,3 +205,59 @@ jobs:
           echo "  - ${SHA_TAG}"
           echo "  - ${LATEST_TAG}"
 
+  # STAGE::05 Deploy (ship the compose + alloy config to the EC2 VM and restart)
+  # Manual-only: triggered by hand from the Actions tab ("Run workflow"), and
+  # ONLY allowed on the main branch (a dispatch from any other branch is a no-op).
+  # The image is already on Docker Hub from the automated push stage, so this
+  # job does NOT rebuild or repush. It simply logs into the VM, pulls the
+  # existing :latest image, and (re)starts the container.
+  deploy:
+    name: Stage 5::Load the image to the VM and deploy
+    runs-on: ubuntu-latest
+    # Manual-only and only from the main branch.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Copy the prod compose file and the Alloy config to the VM so the box
+      # always runs exactly what's in the repo (no manual drift).
+      - name: Copy deployment files to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: "docker-compose.prod.yml,alloy/config.alloy"
+          target: "~/rapid-engine"
+
+      # Pull the already-published :latest image from Docker Hub and restart
+      # the stack. The image was built and pushed by the automated push stage
+      # on the last push to main — this step does not rebuild or repush.
+      # .env must already exist on the VM (it holds all secrets and is
+      # NEVER committed to the repo — see DEPLOYMENT.md).
+      - name: Pull image and restart stack
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ~/rapid-engine
+            export IMAGE="${{ env.DOCKER_IMAGE }}:latest"
+
+            echo "Pulling the latest image from Docker Hub..."
+            docker compose -f docker-compose.prod.yml --env-file .env pull
+            
+            echo "Starting/recreating the application stack..."
+            docker compose -f docker-compose.prod.yml \
+              --env-file .env up -d --remove-orphans
+            
+            echo "Cleaning up unused Docker images..."
+            docker image prune -f
+
+            echo "Current running containers:"
+            docker compose -f docker-compose.prod.yml --env-file .env ps
+
+            
