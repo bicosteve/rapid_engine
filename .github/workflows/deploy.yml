@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Deploy to production VM
+
+# Manual-only. This workflow is triggered by hand from the GitHub UI
+# (Actions tab > "Deploy to production VM" > "Run workflow") or via the
+# GitHub CLI (`gh workflow run deploy.yml --ref main`).
+#
+# It is intentionally separate from ci.yml so that a manual deploy does NOT
+# re-run the test / build / docker-build / docker-push pipeline. The image
+# referenced here is the :latest already published to Docker Hub by ci.yml
+# on the last push to main — this workflow only pulls and (re)starts it.
+on:
+  workflow_dispatch:
+
+env:
+  DOCKER_IMAGE: bixoloo/rapid-engine
+
+jobs:
+  deploy:
+    name: Load the image to the VM and deploy
+    runs-on: ubuntu-latest
+    # Only allow deploys from the main branch.
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Copy the prod compose file and the Alloy config to the VM so the box
+      # always runs exactly what's in the repo (no manual drift).
+      - name: Copy deployment files to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_SSH_PORT || 22 }}
+          source: "docker-compose.prod.yml,alloy/config.alloy"
+          target: "~/rapid-engine"
+
+      # Pull the already-published :latest image from Docker Hub and restart
+      # the stack. .env must already exist on the VM (it holds all secrets and
+      # is NEVER committed to the repo).
+      - name: Pull image and restart stack
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_SSH_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            cd ~/rapid-engine
+            export IMAGE="${{ env.DOCKER_IMAGE }}:latest"
+
+            echo "Pulling the latest image from Docker Hub..."
+            docker compose -f docker-compose.prod.yml --env-file .env pull
+
+            echo "Starting/recreating the application stack..."
+            docker compose -f docker-compose.prod.yml \
+              --env-file .env up -d --remove-orphans
+
+            echo "Cleaning up unused Docker images..."
+            docker image prune -f
+
+            echo "Current running containers:"
+            docker compose -f docker-compose.prod.yml --env-file .env ps
