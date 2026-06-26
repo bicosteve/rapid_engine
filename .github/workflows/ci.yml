@@ -10,8 +10,7 @@ on:
   pull_request:
     branches:
       - main
-  # Dispatch will be triggered when the image is pushed to docker successfully.
-  workflow_dispatch:
+
 
 env:
   JAVA_VERSION: '21'
@@ -82,7 +81,7 @@ jobs:
           echo "Failures  : ${FAILURES}"
           echo "Errors    : ${ERRORS}"
           echo "Skipped   : ${SKIPPED}"
-          echo "Pass rate : ${RATE_INT}.${RATE_DEC}%  (gate: 85%)"
+          echo "Pass rate : ${RATE_INT}.${RATE_DEC}%  (gate: 99%)"
           echo "=========================================="
 
           THRESHOLD=85
@@ -98,7 +97,7 @@ jobs:
         with:
           name: surefire-reports
           path: target/surefire-reports
-          retention-days: 7
+          retention-days: 1
 
   # STAGE::02 Build (package the application jar)
   build:
@@ -131,7 +130,7 @@ jobs:
         with:
           name: rapid-engine-jar
           path: target/*.jar
-          retention-days: 2
+          retention-days: 1
 
   # STAGE::03 Docker Build (build the production image, export it as an artifact)
   docker-build:
@@ -202,62 +201,7 @@ jobs:
           docker push "${LATEST_TAG}"
 
           echo "Successfully pushed:"
-          echo "  - ${SHA_TAG}"
-          echo "  - ${LATEST_TAG}"
-
-  # STAGE::05 Deploy (ship the compose + alloy config to the EC2 VM and restart)
-  # Manual-only: triggered by hand from the Actions tab ("Run workflow"), and
-  # ONLY allowed on the main branch (a dispatch from any other branch is a no-op).
-  # The image is already on Docker Hub from the automated push stage, so this
-  # job does NOT rebuild or repush. It simply logs into the VM, pulls the
-  # existing :latest image, and (re)starts the container.
-  deploy:
-    name: Stage 5::Load the image to the VM and deploy
-    runs-on: ubuntu-latest
-    # Manual-only and only from the main branch.
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # Copy the prod compose file and the Alloy config to the VM so the box
-      # always runs exactly what's in the repo (no manual drift).
-      - name: Copy deployment files to VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          source: "docker-compose.prod.yml,alloy/config.alloy"
-          target: "~/rapid-engine"
-
-      # Pull the already-published :latest image from Docker Hub and restart
-      # the stack. The image was built and pushed by the automated push stage
-      # on the last push to main — this step does not rebuild or repush.
-      # .env must already exist on the VM (it holds all secrets and is
-      # NEVER committed to the repo — see DEPLOYMENT.md).
-      - name: Pull image and restart stack
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: |
-            set -euo pipefail
-            cd ~/rapid-engine
-            export IMAGE="${{ env.DOCKER_IMAGE }}:latest"
-
-            echo "Pulling the latest image from Docker Hub..."
-            docker compose -f docker-compose.prod.yml --env-file .env pull
-            
-            echo "Starting/recreating the application stack..."
-            docker compose -f docker-compose.prod.yml \
-              --env-file .env up -d --remove-orphans
-            
-            echo "Cleaning up unused Docker images..."
-            docker image prune -f
-
-            echo "Current running containers:"
-            docker compose -f docker-compose.prod.yml --env-file .env ps
+          echo " - ${SHA_TAG}"
+          echo " - ${LATEST_TAG}"
 
             
