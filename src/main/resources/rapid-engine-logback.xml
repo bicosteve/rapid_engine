@@ -1,119 +1,27 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <configuration>
     <!-- Properties-->
-    <springProperty name="LOG_PATH" source="log.path" defaultValue="logs"/>
     <property name="APP_NAME" value="rapid-engine"/>
-    <!--    <property name="LOG_PATH" value="${LOG_PATH}"/>-->
-    <property name="LOG_FILE" value="${LOG_PATH}/${APP_NAME}"/>
-    <property name="MAX_HISTORY" value="30"/> <!--keep for 30 days-->
-    <property name="MAX_SIZE" value="50MB"/>
-    <property name="TOTAL_SIZE_CAP" value="500MB"/>
 
-    <!--Set Log Patterns for Console & File -->
+    <!--Set Log Pattern for the human-readable dev console -->
     <property
             name="CONSOLE_PATTERN"
             value="%d{yyyy-MM-dd HH:mm:ss} | %-5level | %logger{25} | %M line %L | %msg%n"
     />
 
-    <property
-            name="FILE_PATTERN"
-            value="%d{yyyy-MM-dd HH:mm:ss} | %-5level | %logger{25} | %X{traceId} | %msg%n"
-    />
-
-    <!--Console Appender-->
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>${CONSOLE_PATTERN}</pattern>
-        </encoder>
-    </appender>
-
-
-    <!-- Daily Rolling File Appender for ALL LOGS -->
-    <appender name="FILE_ALL"
-              class="ch.qos.logback.core.rolling.RollingFileAppender">
-
-        <file>${LOG_FILE}.log</file>
-
-        <rollingPolicy
-                class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <!-- rotate daily - filename - date -->
-            <fileNamePattern>${LOG_FILE}.%d{dd-MM-yyyy}.%i.log</fileNamePattern>
-
-            <!-- Max file size -->
-            <maxFileSize>${MAX_SIZE}</maxFileSize>
-
-            <maxHistory>${MAX_HISTORY}</maxHistory>
-            <!--Total log size cap-->
-            <totalSizeCap>${TOTAL_SIZE_CAP}</totalSizeCap>
-        </rollingPolicy>
-
-        <encoder>
-            <pattern>${FILE_PATTERN}</pattern>
-        </encoder>
-
-    </appender>
-
-
-    <!-- Daily Rolling File Appender  — ERRORS ONLY   -->
-    <appender name="FILE_ERROR"
-              class="ch.qos.logback.core.rolling.RollingFileAppender">
-
-        <file>${LOG_FILE}-error.log</file>
-
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>ERROR</level>
-        </filter>
-
-        <rollingPolicy
-                class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_FILE}-error.%d{dd-MM-yyyy}.%i.log
-            </fileNamePattern>
-
-            <!-- Max file size -->
-            <maxFileSize>${MAX_SIZE}</maxFileSize>
-
-            <maxHistory>${MAX_HISTORY}</maxHistory>
-
-            <totalSizeCap>100MB</totalSizeCap>
-        </rollingPolicy>
-
-        <encoder>
-            <pattern>${FILE_PATTERN}</pattern>
-        </encoder>
-
-    </appender>
-
-    <!-- ASYNC WRAPPER — non-blocking file writes     -->
-    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
-        <appender-ref ref="FILE_ALL"/>
-
-        <!--Queue size before blocking-->
-        <queueSize>512</queueSize>
-
-        <!--Discard low-priority logs when the queue is almost full.-->
-        <discardingThreshold>0</discardingThreshold>
-    </appender>
-
-    <appender name="ASYNC_ERROR" class="ch.qos.logback.classic.AsyncAppender">
-        <appender-ref ref="FILE_ERROR"/>
-
-        <!--Queue size before blocking-->
-        <queueSize>256</queueSize>
-
-        <!--Discard low-priority logs when the queue is almost full.-->
-        <discardingThreshold>0</discardingThreshold>
-    </appender>
+    <!--
+        NOTE: Appenders are defined inside their matching <springProfile> blocks
+        below. Defining a profile-specific appender at the top level (where it is
+        only referenced inside one profile) makes Logback emit a harmless
+        "Appender named [...] not referenced. Skipping further processing." warning
+        whenever that profile is inactive. Scoping each appender to its profile
+        avoids the warning entirely.
+    -->
 
     <!-- ─────────────────────────────────────────── -->
-    <!-- LOGGER LEVELS                                -->
-    <!-- ─────────────────────────────────────────── -->
 
-    <!--    &lt;!&ndash; App packages — DEBUG in dev, INFO in prod &ndash;&gt;-->
-    <!--    <logger name="com.bixx.rapid_engine" level="INFO" additivity="false">-->
-    <!--        <appender-ref ref="CONSOLE"/>-->
-    <!--        <appender-ref ref="ASYNC_FILE"/>-->
-    <!--        <appender-ref ref="ASYNC_ERROR"/>-->
-    <!--    </logger>-->
+    <!-- LOGGER LEVELS -->
+    <!-- ─────────────────────────────────────────── -->
 
     <!-- Spring framework — reduces Spring framework noise -->
     <logger name="org.springframework" level="WARN"/>
@@ -127,11 +35,18 @@
     <!-- RabbitMQ -->
     <logger name="org.springframework.amqp" level="WARN"/>
 
-
-    <!-- Spring Profiles  -->
+    <!-- Spring Profiles -->
     <springProfile name="dev">
-        <!--For dev profile, log to console only-->
+        <!--Console Appender (human-readable, used in dev)-->
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>${CONSOLE_PATTERN}</pattern>
+            </encoder>
+        </appender>
+
+        <!--For dev profile, log human-readable to console only-->
         <root level="DEBUG">
+
             <appender-ref ref="CONSOLE"/>
         </root>
 
@@ -139,25 +54,36 @@
         <logger name="com.bixx.rapid_engine" level="DEBUG" additivity="false">
             <appender-ref ref="CONSOLE"/>
         </logger>
-
-
     </springProfile>
 
     <springProfile name="prod">
-        <!--For prod profile log to file and error -->
+        <!--
+            JSON Console Appender (used in prod).
+            Emits one structured JSON log line per event to stdout. Docker captures
+            stdout and the Grafana Alloy/Promtail agent ships it to Grafana Cloud Loki,
+            where it is searchable by the indexed fields below. No log files are written
+            to disk in prod, so nothing needs to be tailed on the VM.
+        -->
+        <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeMdcKeyName>traceId</includeMdcKeyName>
+                <customFields>{"app":"rapid-engine","env":"prod"}</customFields>
+            </encoder>
+        </appender>
+
+        <!--
+            For prod, log structured JSON to stdout ONLY.
+            The Grafana Alloy agent on the VM ships stdout to Grafana Cloud Loki.
+            No files are written to the container/host filesystem.
+        -->
         <root level="INFO">
-            <appender-ref ref="CONSOLE"/>
-            <appender-ref ref="ASYNC_FILE"/>
-            <appender-ref ref="ASYNC_ERROR"/>
+
+            <appender-ref ref="JSON_CONSOLE"/>
         </root>
 
         <logger name="com.bixx.rapid_engine" level="INFO" additivity="false">
-            <appender-ref ref="CONSOLE"/>
-            <appender-ref ref="ASYNC_FILE"/>
-            <appender-ref ref="ASYNC_ERROR"/>
+            <appender-ref ref="JSON_CONSOLE"/>
         </logger>
-
-
     </springProfile>
 
 </configuration>

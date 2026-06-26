@@ -8,6 +8,7 @@ spring:
       username: ${REDIS_USERNAME:default}
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
       password: ${REDIS_PASSWORD}
       ssl:
         enabled: ${REDIS_SSL_ENABLED:true}
@@ -22,6 +23,10 @@ spring:
     username: ${RABBITMQ_USERNAME}
     password: ${RABBITMQ_PASSWORD}
     virtual-host: ${RABBITMQ_VHOST:/}
+    ssl:
+      # CloudAMQP: set RABBITMQ_SSL_ENABLED=true and RABBITMQ_PORT=5671 to use the
+      # secure AMQPS endpoint. Defaults to plain AMQP (5672) when unset.
+      enabled: ${RABBITMQ_SSL_ENABLED:false}
 
 
 app:
@@ -45,9 +50,8 @@ app:
     delay: ${DELAY}
 
 server:
-  # Render injects $PORT; the Dockerfile also passes -Dserver.port=$PORT
-  # (which takes precedence over this value). Falls back to APP_PORT, then 5002.
-  port: ${PORT:${APP_PORT:5002}}
+  # Bare AWS EC2 VM: we control the port directly via APP_PORT (default 5002).
+  port: ${APP_PORT:5002}
 
 
 logging:
@@ -55,8 +59,7 @@ logging:
   level:
     root: INFO
     com.bixx.rapid_engine: ${LOGGING_LEVEL:INFO}
-    org.apache.coyote: INFO
-    org.springframework.jdbc: ${LOGGING_LEVEL:INFO}
+    org.apache.coyote: WARN
+    org.springframework.jdbc: WARN
+    org.springframework: WARN
 
-log:
-  path: ${LOG_PATH:logs}
