@@ -16,10 +16,10 @@ spring:
       timeout: ${REDIS_TIMEOUT:10000}
 
   rabbitmq:
-    host: ${RABBITMQ_HOST}
+    host: "${RABBITMQ_HOST:}"
     port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME}
-    password: ${RABBITMQ_PASSWORD}
+    username: "${RABBITMQ_USERNAME:}"
+    password: "${RABBITMQ_PASSWORD:}"
     virtual-host: ${RABBITMQ_VHOST:/}
     publisher-confirm-type: correlated
     publisher-returns: true
@@ -29,7 +29,7 @@ spring:
       enabled: ${RABBITMQ_SSL_ENABLED:false}
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    bootstrap-servers: "${KAFKA_BOOTSTRAP_SERVERS:}"
     producer:
       acks: all
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -39,26 +39,26 @@ spring:
 
 app:
   messaging:
-    broker: ${MESSAGING_BROKER}
+    broker: "${MESSAGING_BROKER:}"
 
   rabbitmq:
     matches:
-      exchange: ${RABBITMQ_MATCHES_EXCHANGE}
-      queue: ${RABBITMQ_MATCHES_QUEUE}
-      routing-key: ${RABBITMQ_MATCHES_ROUTING_KEY}
+      exchange: "${RABBITMQ_MATCHES_EXCHANGE:}"
+      queue: "${RABBITMQ_MATCHES_QUEUE:}"
+      routing-key: "${RABBITMQ_MATCHES_ROUTING_KEY:}"
     results:
-      exchange: ${RABBITMQ_RESULTS_EXCHANGE}
-      queue: ${RABBITMQ_RESULTS_QUEUE}
-      routing-key: ${RABBITMQ_RESULTS_ROUTING_KEY}
+      exchange: "${RABBITMQ_RESULTS_EXCHANGE:}"
+      queue: "${RABBITMQ_RESULTS_QUEUE:}"
+      routing-key: "${RABBITMQ_RESULTS_ROUTING_KEY:}"
 
   kafka:
     matches:
-      topic: ${KAFKA_MATCHES_TOPIC}
+      topic: "${KAFKA_MATCHES_TOPIC:}"
     results:
-      topic: ${KAFKA_RESULTS_TOPIC}
+      topic: "${KAFKA_RESULTS_TOPIC:}"
     topic-defaults:
-      partitions: ${KAFKA_TOPIC_PARTITIONS}
-      replication-factor: ${KAFKA_TOPIC_REPLICATION_FACTOR}
+      partitions: ${KAFKA_TOPIC_PARTITIONS:1}
+      replication-factor: ${KAFKA_TOPIC_REPLICATION_FACTOR:1}
 
   rundown-api:
     key: ${RUNDOWN_API_KEY}

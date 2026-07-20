@@ -9,6 +9,7 @@ import com.bixx.rapid_engine.rabbitmq.RabbitMQBeans;
 import com.bixx.rapid_engine.rabbitmq.RabbitMQConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
@@ -19,14 +20,29 @@ import static org.mockito.Mockito.mock;
 
 class BrokerSelectionWiringTest {
 
-    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-        .withUserConfiguration(
+private final ApplicationContextRunner productionContextRunner = new ApplicationContextRunner()
+ .withInitializer(new ConfigDataApplicationContextInitializer())
+ .withUserConfiguration(
+ MessagingTestConfiguration.class,
+ JacksonConfig.class,
+ RabbitMQConfig.class,
+ RabbitMQBeans.class,
+ RabbitEventPublisher.class,
+ KafkaConfig.class,
+ KafkaTopicConfiguration.class,
+ KafkaEventPublisher.class)
+ .withBean(ConnectionFactory.class, () -> mock(ConnectionFactory.class))
+ .withBean(KafkaTemplate.class, () -> mock(KafkaTemplate.class));
+
+ private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+ .withUserConfiguration(
             MessagingTestConfiguration.class,
             JacksonConfig.class,
             RabbitMQConfig.class,
             RabbitMQBeans.class,
-            RabbitEventPublisher.class,
-            KafkaTopicConfiguration.class,
+ RabbitEventPublisher.class,
+ KafkaConfig.class,
+ KafkaTopicConfiguration.class,
             KafkaEventPublisher.class)
         .withBean(ConnectionFactory.class, () -> mock(ConnectionFactory.class))
         .withBean(KafkaTemplate.class, () -> mock(KafkaTemplate.class));
@@ -77,8 +93,52 @@ class BrokerSelectionWiringTest {
             });
     }
 
-    @Test
-    void missingBrokerFailsWithPropertyName() {
+@Test
+ void productionRabbitmqSelectionStartsWithoutKafkaProperties() {
+ productionContextRunner.withPropertyValues(
+ "spring.profiles.active=prod",
+ "MESSAGING_BROKER=rabbitmq",
+ "RABBITMQ_HOST=rabbitmq.example",
+ "RABBITMQ_USERNAME=user",
+ "RABBITMQ_PASSWORD=password",
+ "RABBITMQ_MATCHES_EXCHANGE=matches.exchange",
+ "RABBITMQ_MATCHES_QUEUE=matches.queue",
+ "RABBITMQ_MATCHES_ROUTING_KEY=matches.routing.key",
+ "RABBITMQ_RESULTS_EXCHANGE=results.exchange",
+ "RABBITMQ_RESULTS_QUEUE=results.queue",
+ "RABBITMQ_RESULTS_ROUTING_KEY=results.routing.key")
+ .run(context -> {
+ assertThat(context).hasNotFailed();
+ assertThat(context).hasSingleBean(RabbitEventPublisher.class);
+ assertThat(context).doesNotHaveBean(KafkaEventPublisher.class);
+ assertThat(context).hasBean("matchesQueue");
+ assertThat(context).doesNotHaveBean("matchesTopic");
+ assertThat(context).doesNotHaveBean(KafkaConfig.class);
+ });
+ }
+
+ @Test
+ void productionKafkaSelectionStartsWithoutRabbitmqProperties() {
+ productionContextRunner.withPropertyValues(
+ "spring.profiles.active=prod",
+ "MESSAGING_BROKER=kafka",
+ "KAFKA_BOOTSTRAP_SERVERS=kafka.example:9092",
+ "KAFKA_MATCHES_TOPIC=matches.events",
+ "KAFKA_RESULTS_TOPIC=results.events",
+ "KAFKA_TOPIC_PARTITIONS=1",
+ "KAFKA_TOPIC_REPLICATION_FACTOR=1")
+ .run(context -> {
+ assertThat(context).hasNotFailed();
+ assertThat(context).hasSingleBean(KafkaEventPublisher.class);
+ assertThat(context).doesNotHaveBean(RabbitEventPublisher.class);
+ assertThat(context).hasBean("matchesTopic");
+ assertThat(context).doesNotHaveBean("matchesQueue");
+ assertThat(context).doesNotHaveBean(RabbitMQConfig.class);
+ });
+ }
+
+ @Test
+ void missingBrokerFailsWithPropertyName() {
         contextRunner.run(context -> assertThat(context.getStartupFailure())
             .hasStackTraceContaining("app.messaging.broker"));
     }
@@ -91,7 +151,7 @@ class BrokerSelectionWiringTest {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @EnableConfigurationProperties({MessagingProperties.class, KafkaConfig.class})
+    @EnableConfigurationProperties(MessagingProperties.class)
     static class MessagingTestConfiguration {
     }
 }
