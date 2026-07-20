@@ -6,6 +6,7 @@ import com.bixx.rapid_engine.messaging.EventPublisher;
 import com.bixx.rapid_engine.models.Event;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ private final KafkaConfig kafkaConfig;
 private final ObjectMapper objectMapper;
 private final Duration sendTimeout;
 
+@Autowired
 public KafkaEventPublisher(KafkaTemplate<String, String> kafkaTemplate, KafkaConfig kafkaConfig,
 ObjectMapper objectMapper) {
 this(kafkaTemplate, kafkaConfig, objectMapper, SEND_TIMEOUT);

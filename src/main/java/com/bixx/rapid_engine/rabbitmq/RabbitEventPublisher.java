@@ -10,6 +10,7 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -30,8 +31,9 @@ public class RabbitEventPublisher implements EventPublisher {
     private final ObjectMapper objectMapper;
     private final Duration confirmTimeout;
 
-    public RabbitEventPublisher(
-            RabbitTemplate rabbitTemplate,
+@Autowired
+public RabbitEventPublisher(
+RabbitTemplate rabbitTemplate,
             RabbitMQConfig rabbitMQConfig,
             ObjectMapper objectMapper) {
         this(rabbitTemplate, rabbitMQConfig, objectMapper, CONFIRM_TIMEOUT);
