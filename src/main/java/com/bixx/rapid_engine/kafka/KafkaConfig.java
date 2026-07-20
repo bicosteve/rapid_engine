@@ -1,4 +1,4 @@
-package com.bixx.rapid_engine.rabbitmq;
+package com.bixx.rapid_engine.kafka;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -12,23 +12,26 @@ import org.springframework.validation.annotation.Validated;
 @Data
 @Validated
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(prefix = "app.messaging", name = "broker", havingValue = "rabbitmq")
-@ConfigurationProperties(prefix = "app.rabbitmq")
-public class RabbitMQConfig {
+@ConditionalOnProperty(prefix = "app.messaging", name = "broker", havingValue = "kafka")
+@ConfigurationProperties(prefix = "app.kafka")
+public class KafkaConfig {
  @Valid
  @NotNull
- private QueueConfig matches;
+ private TopicConfig matches;
  @Valid
  @NotNull
- private QueueConfig results;
+ private TopicConfig results;
+private TopicDefaults topicDefaults = new TopicDefaults();
 
- @Data
- public static class QueueConfig{
+@Data
+ public static class TopicConfig {
  @NotBlank
- private String exchange;
- @NotBlank
- private String queue;
- @NotBlank
- private String routingKey;
-    }
+ private String topic;
+}
+
+@Data
+public static class TopicDefaults {
+private int partitions = 1;
+private short replicationFactor = 1;
+}
 }

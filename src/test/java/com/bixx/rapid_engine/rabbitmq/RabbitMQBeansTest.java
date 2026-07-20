@@ -9,12 +9,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,7 +30,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(MockitoExtension.class)
 class RabbitMQBeansTest {
 
-    @Mock private ConnectionFactory connectionFactory;
+ private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+ .withUserConfiguration(RabbitMQBeans.class);
+
+ @Mock private ConnectionFactory connectionFactory;
 
     private RabbitMQConfig config;
     private RabbitMQBeans beans;
@@ -52,9 +57,16 @@ class RabbitMQBeansTest {
         beans = new RabbitMQBeans(config);
     }
 
-    // ============================ matches wiring ============================
+ @Test
+ @DisplayName("Rabbit topology: is inactive when Kafka is selected")
+ void rabbitTopology_isInactiveWhenKafkaIsSelected() {
+ contextRunner.withPropertyValues("app.messaging.broker=kafka")
+ .run(context -> assertThat(context).doesNotHaveBean(RabbitMQBeans.class));
+ }
 
-    @Test
+// ============================ matches wiring ============================
+
+@Test
     @DisplayName("matchesQueue: uses the queue name from config")
     void matchesQueue_hasCorrectName() {
         Queue queue = beans.matchesQueue();
@@ -141,7 +153,8 @@ class RabbitMQBeansTest {
         RabbitTemplate template = beans.rabbitTemplate(connectionFactory, converter);
 
         assertThat(template).isNotNull();
-        assertThat(template.getConnectionFactory()).isSameAs(connectionFactory);
-        assertThat(template.getMessageConverter()).isSameAs(converter);
+ assertThat(template.getConnectionFactory()).isSameAs(connectionFactory);
+ assertThat(template.getMessageConverter()).isSameAs(converter);
+ assertThat(template.isMandatoryFor(new Message(new byte[0]))).isTrue();
     }
 }

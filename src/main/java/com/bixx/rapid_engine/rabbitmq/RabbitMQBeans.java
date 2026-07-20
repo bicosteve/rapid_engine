@@ -10,10 +10,16 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@ConditionalOnProperty(
+ prefix = "app.messaging",
+ name = "broker",
+ havingValue = "rabbitmq"
+)
 @RequiredArgsConstructor
 public class RabbitMQBeans {
     private final RabbitMQConfig rabbitMQConfig;
@@ -76,10 +82,11 @@ public class RabbitMQBeans {
     public RabbitTemplate rabbitTemplate(
             ConnectionFactory factory,
             MessageConverter messageConverter
-    ){
-        RabbitTemplate template = new RabbitTemplate(factory);
-        template.setMessageConverter(messageConverter);
-        return template;
-    }
+){
+ RabbitTemplate template = new RabbitTemplate(factory);
+ template.setMessageConverter(messageConverter);
+ template.setMandatory(true);
+ return template;
+ }
 
 }

@@ -1,14 +1,14 @@
 package com.bixx.rapid_engine.producer;
 
 import com.bixx.rapid_engine.config.RundownConfig;
+import com.bixx.rapid_engine.messaging.EventChannel;
+import com.bixx.rapid_engine.messaging.EventPublisher;
 import com.bixx.rapid_engine.models.Event;
 import com.bixx.rapid_engine.models.Meta;
 import com.bixx.rapid_engine.models.RundownResponse;
-import com.bixx.rapid_engine.rabbitmq.RabbitMQConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
@@ -24,11 +24,10 @@ import java.util.List;
 @Slf4j
 public class EventProducer {
 
-    private final RundownConfig rundownConfig;
-    private final RestTemplate restTemplate;
-    private final RabbitTemplate rabbitTemplate;
-    private final RabbitMQConfig rabbitMQConfig;
-    private final ObjectMapper objectMapper;
+private final RundownConfig rundownConfig;
+private final RestTemplate restTemplate;
+private final EventPublisher eventPublisher;
+private final ObjectMapper objectMapper;
     private final RedisTemplate<String, String> stringRedisTemplate;
 
     public int fetchEvents(Integer sportsId){
@@ -123,28 +122,18 @@ public class EventProducer {
             return 0;
         }
 
-        // 06. Get events & meta from response
-        Meta meta = rundownResponse.getMeta();
-        String newDeltaLastId = meta.getDeltaLastId();
-        if(newDeltaLastId != null) {
-            this.stringRedisTemplate
-                    .opsForValue()
-                    .set(redisKey, newDeltaLastId, Duration.ofHours(24));
+// 06. Publish each event before advancing the cursor
+Meta meta = rundownResponse.getMeta();
+String newDeltaLastId = meta == null ? null : meta.getDeltaLastId();
 
-            log.info(
-                    "Sport Id {} - saved new delta {}",
-                    sportsId,
-                    newDeltaLastId);
-        }
+for (Event event : events) {
+eventPublisher.publish(EventChannel.MATCHES, event);
+}
 
-        // 07. Publish each event from the events list to RabbitMQ
-        events.forEach(event -> {
-            this.rabbitTemplate.convertAndSend(
-                    this.rabbitMQConfig.getMatches().getExchange(),
-                    this.rabbitMQConfig.getMatches().getRoutingKey(),
-                    event);
-
-        });
+if (newDeltaLastId != null) {
+stringRedisTemplate.opsForValue().set(redisKey, newDeltaLastId, Duration.ofHours(24));
+log.info("Sport Id {} - saved new delta {}", sportsId, newDeltaLastId);
+}
 
         return events.size();
     }

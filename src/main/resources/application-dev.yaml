@@ -13,18 +13,40 @@ spring:
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
     virtual-host: /
+    publisher-confirm-type: correlated
+    publisher-returns: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
 
 app:
+  messaging:
+    broker: ${MESSAGING_BROKER:rabbitmq}
+
   rabbitmq:
     matches:
-      exchange: ${RABBITMQ_MATCHES_EXCHANGE}
-      queue: ${RABBITMQ_MATCHES_QUEUE}
-      routing-key: ${RABBITMQ_MATCHES_ROUTING_KEY}
-
+      exchange: ${RABBITMQ_MATCHES_EXCHANGE:matches.exchange}
+      queue: ${RABBITMQ_MATCHES_QUEUE:matches.queue}
+      routing-key: ${RABBITMQ_MATCHES_ROUTING_KEY:matches.routing.key}
     results:
-      exchange: ${RABBITMQ_RESULTS_EXCHANGE}
-      queue: ${RABBITMQ_RESULTS_QUEUE}
-      routing-key: ${RABBITMQ_RESULTS_ROUTING_KEY}
+      exchange: ${RABBITMQ_RESULTS_EXCHANGE:results.exchange}
+      queue: ${RABBITMQ_RESULTS_QUEUE:results.queue}
+      routing-key: ${RABBITMQ_RESULTS_ROUTING_KEY:results.routing.key}
+
+  kafka:
+    matches:
+      topic: ${KAFKA_MATCHES_TOPIC:matches.events}
+    results:
+      topic: ${KAFKA_RESULTS_TOPIC:results.events}
+    topic-defaults:
+      partitions: ${KAFKA_TOPIC_PARTITIONS:1}
+      replication-factor: ${KAFKA_TOPIC_REPLICATION_FACTOR:1}
 
   rundown-api:
     key: ${RUNDOWN_API_KEY}
