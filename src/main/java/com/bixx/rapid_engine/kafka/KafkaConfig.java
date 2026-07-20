@@ -10,5 +10,5 @@ public class KafkaConfig {
     private String matchesTopic = "matches";
     private String resultsTopic = "results";
     private int partitions = 1;
-    private short replicationFactor = 3;
+    private short replicationFactor = 1;
 }
