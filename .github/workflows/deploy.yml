@@ -38,8 +38,8 @@ jobs:
           target: "~/rapid-engine"
 
       # Pull the already-published :latest image from Docker Hub and restart
-      # the stack. .env must already exist on the VM (it holds all secrets and
-      # is NEVER committed to the repo).
+      # the stack. ~/rapid-engine/.env.prod must already exist on the VM (it holds
+      # all secrets and is NEVER committed to the repo).
       - name: Pull image and restart stack
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -51,16 +51,18 @@ jobs:
             set -euo pipefail
             cd ~/rapid-engine
             export IMAGE="${{ env.DOCKER_IMAGE }}:latest"
+            export APP_ENV_FILE="$HOME/rapid-engine/.env.prod"
+            test -f "$APP_ENV_FILE"
 
             echo "Pulling the latest image from Docker Hub..."
-            docker compose -f docker-compose.prod.yml --env-file .env pull
+            docker compose -f docker-compose.prod.yml --env-file "$APP_ENV_FILE" pull
 
             echo "Starting/recreating the application stack..."
             docker compose -f docker-compose.prod.yml \
-              --env-file .env up -d --remove-orphans
+              --env-file "$APP_ENV_FILE" up -d --remove-orphans
 
             echo "Cleaning up unused Docker images..."
             docker image prune -f
 
             echo "Current running containers:"
-            docker compose -f docker-compose.prod.yml --env-file .env ps
+            docker compose -f docker-compose.prod.yml --env-file "$APP_ENV_FILE" ps

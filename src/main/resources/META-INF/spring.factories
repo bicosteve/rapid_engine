@@ -1,0 +1,2 @@
+org.springframework.boot.autoconfigure.AutoConfigurationImportFilter=\
+com.bixx.rapid_engine.messaging.BrokerAutoConfigurationImportFilter

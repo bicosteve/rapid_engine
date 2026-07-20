@@ -1,20 +1,22 @@
 package com.bixx.rapid_engine.producer;
 
 import com.bixx.rapid_engine.config.RundownConfig;
+import com.bixx.rapid_engine.messaging.EventChannel;
+import com.bixx.rapid_engine.messaging.EventPublishException;
+import com.bixx.rapid_engine.messaging.EventPublisher;
 import com.bixx.rapid_engine.models.Event;
 import com.bixx.rapid_engine.models.Meta;
 import com.bixx.rapid_engine.models.RundownResponse;
-import com.bixx.rapid_engine.rabbitmq.RabbitMQConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpEntity;
@@ -29,9 +31,12 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -41,7 +46,7 @@ import static org.mockito.Mockito.when;
  * Unit tests for {@link EventProducer}.
  *
  * <p>The producer is tested in isolation by mocking every collaborator
- * (REST client, RabbitTemplate, RedisTemplate, ObjectMapper, configs).
+ * (REST client, EventPublisher, RedisTemplate, ObjectMapper, configs).
  * The private {@code fetchEventsForADate} method is exercised via reflection
  * so we don't pay the 1.2s inter-call {@code Thread.sleep} cost that the
  * public {@code fetchEvents} would impose.
@@ -51,39 +56,23 @@ import static org.mockito.Mockito.when;
 class EventProducerTest {
 
     @Mock private RundownConfig rundownConfig;
-    @Mock private RestTemplate restTemplate;
-    @Mock private RabbitTemplate rabbitTemplate;
-    @Mock private RabbitMQConfig rabbitMQConfig;
-    @Mock private ObjectMapper objectMapper;
+@Mock private RestTemplate restTemplate;
+ @Mock private EventPublisher eventPublisher;
+ @Mock private ObjectMapper objectMapper;
     @Mock private RedisTemplate<String, String> stringRedisTemplate;
     @Mock private ValueOperations<String, String> valueOps;
 
-    private EventProducer eventProducer;
-    private RabbitMQConfig.QueueConfig matches;
-    private RabbitMQConfig.QueueConfig results;
+ private EventProducer eventProducer;
+
 
     @BeforeEach
     void setUp() {
-        eventProducer = new EventProducer(
-                rundownConfig,
-                restTemplate,
-                rabbitTemplate,
-                rabbitMQConfig,
-                objectMapper,
-                stringRedisTemplate);
-
-        matches = new RabbitMQConfig.QueueConfig();
-        matches.setExchange("matches.exchange");
-        matches.setQueue("matches.queue");
-        matches.setRoutingKey("matches.routing.key");
-
-        results = new RabbitMQConfig.QueueConfig();
-        results.setExchange("results.exchange");
-        results.setQueue("results.queue");
-        results.setRoutingKey("results.routing.key");
-
-        when(rabbitMQConfig.getMatches()).thenReturn(matches);
-        when(rabbitMQConfig.getResults()).thenReturn(results);
+ eventProducer = new EventProducer(
+ rundownConfig,
+ restTemplate,
+ eventPublisher,
+ objectMapper,
+ stringRedisTemplate);
         when(rundownConfig.getHost()).thenReturn("https://api.example.com");
         when(rundownConfig.getKey()).thenReturn("test-key");
         when(rundownConfig.getAffiliateId()).thenReturn("23");
@@ -115,7 +104,7 @@ class EventProducerTest {
         int result = eventProducer.fetchEvents(1);
 
         assertThat(result).isZero();
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), (Object) any());
+        verify(eventPublisher, never()).publish(eq(EventChannel.MATCHES), any(Event.class));
     }
 
     // =========================================================================
@@ -204,23 +193,28 @@ class EventProducerTest {
         int result = invokeFetchForADate(1, LocalDate.now());
 
         assertThat(result).isZero();
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), (Object) any());
+        verify(eventPublisher, never()).publish(eq(EventChannel.MATCHES), any(Event.class));
         verify(valueOps, never()).set(anyString(), anyString(), any(Duration.class));
     }
 
     @Test
-    @DisplayName("fetchEventsForADate: returns 0 when events list is empty")
-    void fetchEventsForADate_returnsZeroOnEmptyEvents() throws Exception {
+    @DisplayName("fetchEventsForADate: advances a new cursor after an empty successful batch")
+    void fetchEventsForADate_advancesCursorAfterEmptyBatch() throws Exception {
         when(valueOps.get(anyString())).thenReturn(null);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok("{}"));
         when(objectMapper.readValue(eq("{}"), eq(RundownResponse.class)))
-                .thenReturn(RundownResponse.builder().events(List.of()).build());
+                .thenReturn(RundownResponse.builder()
+                        .meta(Meta.builder().deltaLastId("new-delta-42").build())
+                        .events(List.of())
+                        .build());
 
         int result = invokeFetchForADate(1, LocalDate.now());
 
         assertThat(result).isZero();
-        verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), (Object) any());
+        verify(eventPublisher, never()).publish(eq(EventChannel.MATCHES), any(Event.class));
+        verify(valueOps).set(
+                "rundown:delta_last_id:1", "new-delta-42", Duration.ofHours(24));
     }
 
     @Test
@@ -237,40 +231,59 @@ class EventProducerTest {
         assertThat(result).isZero();
     }
 
-    @Test
-    @DisplayName("fetchEventsForADate: publishes one message per event to the matches exchange")
-    void fetchEventsForADate_publishesEachEvent() throws Exception {
-        when(valueOps.get(anyString())).thenReturn(null);
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
-                .thenReturn(ResponseEntity.ok("{}"));
-        when(objectMapper.readValue(eq("{}"), eq(RundownResponse.class)))
-                .thenReturn(responseWithEvents(3));
+ @Test
+ @DisplayName("fetchEventsForADate: publishes every event through the matches channel before saving its cursor")
+ void fetchEventsForADate_publishesEventsBeforeSavingCursor() throws Exception {
+ when(valueOps.get(anyString())).thenReturn(null);
+ when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+ .thenReturn(ResponseEntity.ok("{}"));
+ when(objectMapper.readValue(eq("{}"), eq(RundownResponse.class)))
+ .thenReturn(responseWithDelta("new-delta-42", 2));
 
-        int result = invokeFetchForADate(1, LocalDate.now());
+ int result = invokeFetchForADate(1, LocalDate.now());
 
-        assertThat(result).isEqualTo(3);
-        verify(rabbitTemplate, times(3)).convertAndSend(
-                eq("matches.exchange"),
-                eq("matches.routing.key"),
-                any(Event.class));
-    }
+ assertThat(result).isEqualTo(2);
+ InOrder inOrder = inOrder(eventPublisher, valueOps);
+ inOrder.verify(eventPublisher, times(2))
+ .publish(eq(EventChannel.MATCHES), any(Event.class));
+ inOrder.verify(valueOps).set(
+ "rundown:delta_last_id:1", "new-delta-42", Duration.ofHours(24));
+ }
 
-    @Test
-    @DisplayName("fetchEventsForADate: persists the new delta_last_id in Redis with 24h TTL")
-    void fetchEventsForADate_persistsDeltaWithTtl() throws Exception {
-        when(valueOps.get(anyString())).thenReturn(null);
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
-                .thenReturn(ResponseEntity.ok("{}"));
-        when(objectMapper.readValue(eq("{}"), eq(RundownResponse.class)))
-                .thenReturn(responseWithDelta("new-delta-42", 1));
+ @Test
+ @DisplayName("fetchEventsForADate: leaves cursor unchanged and stops when publishing fails")
+ void fetchEventsForADate_doesNotAdvanceCursorAfterPublishFailure() throws Exception {
+ when(valueOps.get(anyString())).thenReturn(null);
+ when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+ .thenReturn(ResponseEntity.ok("{}"));
+ when(objectMapper.readValue(eq("{}"), eq(RundownResponse.class)))
+ .thenReturn(responseWithDelta("new-delta-42", 2));
+ doThrow(new EventPublishException("broker unavailable"))
+ .when(eventPublisher).publish(eq(EventChannel.MATCHES), any(Event.class));
 
-        invokeFetchForADate(1, LocalDate.now());
+ assertThatThrownBy(() -> invokeFetchForADate(1, LocalDate.now()))
+ .hasCauseInstanceOf(EventPublishException.class);
 
-        verify(valueOps).set(
-                eq("rundown:delta_last_id:1"),
-                eq("new-delta-42"),
-                eq(Duration.ofHours(24)));
-    }
+ verify(eventPublisher, times(1)).publish(eq(EventChannel.MATCHES), any(Event.class));
+ verify(valueOps, never()).set(anyString(), anyString(), any(Duration.class));
+ }
+
+ @Test
+ @DisplayName("fetchEventsForADate: persists the new delta_last_id in Redis with 24h TTL")
+ void fetchEventsForADate_persistsDeltaWithTtl() throws Exception {
+ when(valueOps.get(anyString())).thenReturn(null);
+ when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+ .thenReturn(ResponseEntity.ok("{}"));
+ when(objectMapper.readValue(eq("{}"), eq(RundownResponse.class)))
+ .thenReturn(responseWithDelta("new-delta-42", 1));
+
+ invokeFetchForADate(1, LocalDate.now());
+
+ verify(valueOps).set(
+ eq("rundown:delta_last_id:1"),
+ eq("new-delta-42"),
+ eq(Duration.ofHours(24)));
+ }
 
     @Test
     @DisplayName("fetchEventsForADate: skips Redis SET when the new delta_last_id is null")

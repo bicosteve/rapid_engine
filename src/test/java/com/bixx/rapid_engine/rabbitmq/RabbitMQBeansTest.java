@@ -9,12 +9,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -143,5 +145,23 @@ class RabbitMQBeansTest {
         assertThat(template).isNotNull();
         assertThat(template.getConnectionFactory()).isSameAs(connectionFactory);
         assertThat(template.getMessageConverter()).isSameAs(converter);
+        assertThat(template.isMandatoryFor(new Message(new byte[0]))).isTrue();
+    }
+
+    @Test
+    @DisplayName("Rabbit topology is inactive when Kafka is selected")
+    void rabbitTopology_isInactiveInKafkaMode() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(RabbitMQBeans.class)
+                .withPropertyValues("app.messaging.broker=kafka")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean(RabbitMQBeans.class);
+                    assertThat(context).doesNotHaveBean(Queue.class);
+                    assertThat(context).doesNotHaveBean(TopicExchange.class);
+                    assertThat(context).doesNotHaveBean(Binding.class);
+                    assertThat(context).doesNotHaveBean(MessageConverter.class);
+                    assertThat(context).doesNotHaveBean(RabbitTemplate.class);
+                });
     }
 }

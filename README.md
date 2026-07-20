@@ -6,8 +6,8 @@
 
 A production-style **Spring Boot microservice** that
 polls [The Rundown](https://www.therundown.ai/) for live sports events, lines,
-and odds, then streams them onto **RabbitMQ** topics for downstream consumers in
-a sportsbook data pipeline.
+and odds, then streams them through a selectable **RabbitMQ or Kafka** broker to
+downstream consumers in a sportsbook data pipeline.
 
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](#)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.11-6DB33F?logo=springboot&logoColor=white)](#)
@@ -56,9 +56,9 @@ around a **delta-driven** model: each successful API call returns a
 for the next incremental fetch. This keeps the network chatter and the per-cycle
 API quota small even as the configured list of sports grows.
 
-The fetched events are then serialized with Jackson and dispatched onto
-**RabbitMQ topic exchange**, decoupling ingestion from the consumers that
-persist the events.
+The fetched events are serialized with Jackson and dispatched through the
+selected broker, decoupling ingestion from the consumers that persist the
+events.
 
 ---
 
@@ -70,8 +70,9 @@ persist the events.
 | **Round-Robin Sports Cycling**         | Distributes API load across 38 sport IDs (e.g. football, basketball, tennis) over successive cycles                 |
 | **Delta-Aware Fetches**                | Uses the `delta_last_id` returned by The Rundown, persisted in Redis with a 24h TTL, to perform incremental updates |
 | **Multi-Day Windows**                  | Pulls *yesterday*, *today*, and (optionally) *tomorrow* fixtures in a single cycle                                  |
-| **RabbitMQ Producer**                  | Declares `matches.*` and `results.*` topic exchanges, queues, and bindings on startup                               |
-| **Externalized Configuration**         | All secrets & environment-specific values are read from a `.env` file via `spring-dotenv`                           |
+| **Selectable Broker Publisher** | Routes events through RabbitMQ (exchanges, queues, bindings) or Kafka (topics) |
+| **Acknowledged Batch Publishing** | Advances a fetched response cursor only after every event has broker acknowledgement; retries may redeliver events |
+| **Externalized Configuration** | All secrets & environment-specific values are read from a `.env` file via `spring-dotenv` |
 | **Snake-Case JSON**                    | Global Jackson `ObjectMapper` mapped to snake_case — no more `@JsonProperty` boilerplate                            |
 | **Redis-Backed Cursor**                | Hot, low-latency storage for the per-sport delta cursor with automatic expiry                                       |
 | **Profile-Aware Logging**              | Console-only in `dev`, size+time-rotated async file logs (with a dedicated error stream) in `prod`                  |
@@ -83,45 +84,28 @@ persist the events.
 ## Architecture
 
 ```
-                    ┌──────────────────────┐
-                    │  The Rundown API     │
-                    │  (sports odds feed)  │
-                    └──────────┬───────────┘
-                               │  HTTPS (delta + events)
-                               ▼
-       ┌──────────────────────────────────────────────┐
-       │              Rapid Engine                    │
-       │                                              │
-       │  ┌──────────────────┐   ┌──────────────────┐ │
-       │  │  MatchSyncTask   │──▶│  EventProducer   │ │
-       │  │  (@Scheduled)    │   │  (REST client)   │ │
-       │  └──────────────────┘   └────────┬─────────┘ │
-       │                                  │           │
-       │                       ┌──────────▼────────┐  │
-       │                       │      Redis        │  │
-       │                       │ (delta_last_id)   │  │
-       │                       └──────────┬────────┘  │
-       │                                  │           │
-       │                       ┌──────────▼────────┐  │
-       │                       │   RabbitTemplate  │  │
-       │                       │ (JSON converter)  │  │
-       │                       └──────────┬────────┘  │
-       └──────────────────────────────────┼───────────┘
-                                          │
-                          ┌───────────────┴───────────────┐
-                          ▼                               ▼
-                ┌──────────────────┐           ┌──────────────────┐
-                │  matches.exchange│           │ results.exchange │
-                │  (topic)         │           │ (topic)          │
-                └──────────────────┘           └──────────────────┘
-                          │                               │
-                          ▼                               ▼
-                ┌──────────────────┐           ┌──────────────────┐
-                │  matches.queue   │           │ results.queue    │
-                │  (downstream DB) │           │  (settlement)    │
-                │                  │           │                  │
-                └──────────────────┘           └──────────────────┘
+┌──────────────────┐     HTTPS (delta + events)
+│ The Rundown API  │ ────────────────────────────┐
+└──────────────────┘                             │
+                                                   ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ Rapid Engine                                                     │
+│ MatchSyncTask → EventProducer → EventPublisher                  │
+│                       │                         │                │
+│                       └── Redis (delta_last_id) ├─ RabbitEventPublisher
+│                                                  │    → exchanges / queues
+│                                                  └─ KafkaEventPublisher
+│                                                       → topics
+└──────────────────────────────────────────────────────────────────┘
+                                                   │
+                                                   ▼
+                                  selected broker → downstream consumers
 ```
+
+`MESSAGING_BROKER` selects exactly one publisher implementation:
+`EventProducer` → `EventPublisher` → `RabbitEventPublisher` **or**
+`KafkaEventPublisher`. `EventProducer` is broker-agnostic; broker-specific
+topology and delivery metadata remain inside the selected publisher.
 
 **Flow in plain English:**
 
@@ -133,10 +117,14 @@ persist the events.
    *tomorrow*.
 5. The response is deserialized into a `RundownResponse` of `Event` aggregates (
    each carrying its `Scores`, `Teams[]`, `Markets[]`, and `Prices`).
-6. Each `Event` is JSON-serialized and published to the **`matches`** topic
-   exchange.
-7. The new `delta_last_id` is written back to Redis (TTL: 24h).
-8. The next sport in the list is selected, and the cycle continues.
+6. Each `Event` is JSON-serialized and published through the selected
+`EventPublisher`; the broker-specific publisher waits for acknowledgement.
+7. Only after all events in that fetched response batch are acknowledged is the
+new `delta_last_id` written back to Redis (TTL: 24h).
+8. If any publish fails, the batch retains its previous cursor and is retried on
+a later fetch; consumers must deduplicate because this is at-least-once
+delivery.
+9. The next sport in the list is selected, and the cycle continues.
 
 ---
 
@@ -148,7 +136,7 @@ persist the events.
 | Framework            | **Spring Boot 3.5.11**                            |
 | Build Tool           | **Maven** (with the `mvnw` wrapper)               |
 | Web/REST             | `spring-boot-starter-web` (`RestTemplate`)        |
-| Messaging            | `spring-boot-starter-amqp` (RabbitMQ)             |
+| Messaging | `spring-boot-starter-amqp` (RabbitMQ) and `spring-kafka` (Kafka); one selected at runtime |
 | Cache & Cursor Store | `spring-boot-starter-data-redis`                  |
 | JSON                 | **Jackson** (`JavaTimeModule`, snake_case naming) |
 | Logging              | **Logback** with profile-specific configuration   |
@@ -178,11 +166,17 @@ rapid-engine/
     │   │   │   ├── JacksonConfig.java        # Global ObjectMapper (snake_case, JavaTime)
     │   │   │   ├── RedisConfig.java          # StringRedisTemplate
     │   │   │   └── RundownConfig.java        # @ConfigurationProperties("app.rundown-api")
-    │   │   ├── rabbitmq/
-    │   │   │   ├── RabbitMQConfig.java       # @ConfigurationProperties("app.rabbitmq")
-    │   │   │   └── RabbitMQBeans.java        # Queues, exchanges, bindings, RabbitTemplate
-    │   │   ├── producer/
-    │   │   │   └── EventProducer.java        # The actual ingestion logic
+│ │ ├── messaging/
+│ │ │ ├── EventPublisher.java # Broker-neutral publishing contract
+│ │ │ └── MessagingProperties.java # Selected broker configuration
+│ │ ├── rabbitmq/
+│ │ │ ├── RabbitEventPublisher.java # Confirmed RabbitMQ delivery
+│ │ │ └── RabbitMQBeans.java # Queues, exchanges, bindings, RabbitTemplate
+│ │ ├── kafka/
+│ │ │ ├── KafkaEventPublisher.java # Acknowledged Kafka delivery
+│ │ │ └── KafkaTopicConfiguration.java # Topic provisioning
+│ │ ├── producer/
+│ │ │ └── EventProducer.java # Fetches batches, publishes, then advances cursor
     │   │   ├── utils/
     │   │   │   └── MatchSyncTask.java        # @Scheduled poller (round-robin)
     │   │   └── models/
@@ -220,7 +214,8 @@ network):
   java -version
   ```
 - **Maven 3.9+** (or use the bundled `./mvnw` wrapper)
-- **RabbitMQ** instance (local Docker is fine)
+- **Docker** (required for the local Compose stack and Testcontainers integration tests)
+- **RabbitMQ and Kafka** instances (the local Compose stack starts both; choose one with `MESSAGING_BROKER`)
 - **Redis** instance
 - A valid **Rundown API key** (sign up
   at [therundown.ai](https://www.therundown.ai/))
@@ -251,18 +246,31 @@ RUNDOWN_BASE_URL=https://api.therundown.io/v1
 RUNDOWN_SPORT_IDS=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,32,33,38,39
 AFFILIATE_IDS=23
 
+# Required in every profile; allowed values: rabbitmq, kafka.
+# Local convenience selection; do not rely on a profile fallback.
+MESSAGING_BROKER=rabbitmq
+
 RABBITMQ_HOST=localhost
 RABBITMQ_PORT=5672
 RABBITMQ_USERNAME=guest
 RABBITMQ_PASSWORD=guest
-
 RABBITMQ_MATCHES_EXCHANGE=matches.exchange
 RABBITMQ_MATCHES_QUEUE=matches.queue
-RABBITMQ_MATCHES_ROUTING_KEY=matches.routing.key
-
+RABBITMQ_MATCHES_ROUTING_KEY=matches
 RABBITMQ_RESULTS_EXCHANGE=results.exchange
 RABBITMQ_RESULTS_QUEUE=results.queue
-RABBITMQ_ROUTING_KEY=results.routing.key
+RABBITMQ_RESULTS_ROUTING_KEY=results
+
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+KAFKA_MATCHES_TOPIC=matches
+KAFKA_RESULTS_TOPIC=results
+KAFKA_PARTITIONS=1
+KAFKA_REPLICATION_FACTOR=1
+# Local plaintext defaults; set SASL_SSL plus provider credentials for managed Kafka.
+KAFKA_SECURITY_PROTOCOL=PLAINTEXT
+KAFKA_SASL_MECHANISM=
+KAFKA_SASL_JAAS_CONFIG=
+KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=https
 
 REDIS_HOST=localhost
 REDIS_PORT=6379
@@ -271,18 +279,32 @@ REDIS_PORT=6379
 > The `spring-dotenv` library auto-loads `.env` at startup. No need to`export`
 > anything manually.
 
-### 3. Start dependencies (Docker quickstart)
+### 3. Start local dependencies
+
+The development Compose stack starts **Redis, RabbitMQ, and Kafka**. It exposes
+RabbitMQ AMQP on `5673`, its management UI on `15673`, Redis on `6380`, and
+Kafka on `9092`.
 
 ```bash
-# RabbitMQ with management UI
-docker run -d --name rabbit \
-  -p 5672:5672 -p 15672:15672 \
-  -e RABBITMQ_DEFAULT_USER=guest \
-  -e RABBITMQ_DEFAULT_PASS=guest \
-  rabbitmq:3-management
+docker compose up -d redis rabbitmq kafka
+```
 
-# Redis
-docker run -d --name redis -p 6379:6379 redis:7-alpine
+Run the application with the matching host ports from `.env`:
+
+```dotenv
+REDIS_HOST=localhost
+REDIS_PORT=6380
+RABBITMQ_HOST=localhost
+RABBITMQ_PORT=5673
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+```
+
+Switch brokers by changing only `MESSAGING_BROKER`; both broker services remain
+available in Compose:
+
+```bash
+MESSAGING_BROKER=rabbitmq ./mvnw spring-boot:run
+MESSAGING_BROKER=kafka ./mvnw spring-boot:run
 ```
 
 ### 4. Build & run
@@ -314,10 +336,13 @@ All runtime configuration is driven by `application.yml` and
 
 ### Active profiles
 
-`application.yml` activates the `dev` profile by default. To run in `prod`, set:
+`application.yml` activates the `dev` profile by default. In **every** profile,
+`MESSAGING_BROKER` is required and must be either `rabbitmq` or `kafka`.
+The checked-in environment examples explicitly select `rabbitmq` as a local
+convenience; application configuration itself has no broker fallback.
 
 ```bash
-SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run
+SPRING_PROFILES_ACTIVE=prod MESSAGING_BROKER=kafka ./mvnw spring-boot:run
 ```
 
 ### `application-dev.yaml` keys
@@ -325,9 +350,12 @@ SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run
 | Key                               | Source | Purpose                                    |
 |-----------------------------------|--------|--------------------------------------------|
 | `spring.data.redis.host` / `port` | env    | Redis connection                           |
-| `spring.rabbitmq.*`               | env    | RabbitMQ connection                        |
-| `app.rabbitmq.matches.*`          | env    | Matches exchange/queue/routing key         |
-| `app.rabbitmq.results.*`          | env    | Results exchange/queue/routing key         |
+| `app.messaging.broker` / `MESSAGING_BROKER` | env | Required broker selection in every profile: `rabbitmq` or `kafka` |
+| `spring.rabbitmq.*` | env | RabbitMQ connection when RabbitMQ is selected |
+| `app.rabbitmq.matches.*` | env | Rabbit matches exchange/queue/routing key |
+| `app.rabbitmq.results.*` | env | Rabbit results exchange/queue/routing key |
+| `spring.kafka.bootstrap-servers` | env | Kafka bootstrap endpoint when Kafka is selected |
+| `app.kafka.*` | env | Kafka matches/results topics and provisioned partition/replication settings |
 | `app.rundown-api.key`             | env    | The Rundown API key                        |
 | `app.rundown-api.host`            | env    | The Rundown base URL                       |
 | `app.rundown-api.sports-id`       | env    | Comma-separated list of sport IDs to cycle |
@@ -358,8 +386,8 @@ started, it will:
 2. After 20s, perform the **first fetch** for sport ID #1.
 3. Continue cycling through every sport ID in `RUNDOWN_SPORT_IDS`, one per
    cycle.
-4. Publish every fetched event to the `matches` exchange.
-5. Log a summary of published events per cycle.
+4. Publish every fetched event to the selected broker's `matches` destination.
+5. Log a summary of acknowledged events per cycle.
 
 To verify it's working, tail the logs:
 
@@ -368,14 +396,17 @@ tail -f logs/rapid-engine.log         # prod profile
 ./mvnw spring-boot:run                # dev profile (console)
 ```
 
-In another terminal, watch the queue grow:
+In another terminal, inspect the selected broker or the cursor:
 
 ```bash
-# RabbitMQ management UI
-open http://localhost:15672            # guest / guest
+# RabbitMQ management UI for the Compose stack (guest / guest)
+open http://localhost:15673
 
-# Or via redis-cli to inspect delta cursors
-redis-cli GET rundown:delta_last_id:1
+# Kafka topics for the Compose stack
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+
+# Redis cursor for the Compose stack
+redis-cli -p 6380 GET rundown:delta_last_id:1
 ```
 
 ### Sample log output
@@ -392,32 +423,49 @@ redis-cli GET rundown:delta_last_id:1
 
 ## Messaging Contract
 
-The service declares two topic exchanges. Downstream services must bind their
-queues to the corresponding routing keys.
+The logical channels are `matches` and `results`. `MESSAGING_BROKER` selects
+which physical destination receives each channel.
 
-### `matches` channel
+### RabbitMQ destinations
 
-| Component   | Value                                                          |
-|-------------|----------------------------------------------------------------|
-| Exchange    | `RABBITMQ_MATCHES_EXCHANGE` (default `matches.exchange`)       |
-| Queue       | `RABBITMQ_MATCHES_QUEUE` (default `matches.queue`)             |
-| Routing key | `RABBITMQ_MATCHES_ROUTING_KEY` (default `matches.routing.key`) |
-| Payload     | `Event` JSON (see [Data Model](#-data-model))                  |
+RabbitMQ declares a topic exchange, queue, and binding for each channel:
 
-### `results` channel
+| Channel | Exchange | Queue | Routing key |
+|---|---|---|---|
+| `matches` | `RABBITMQ_MATCHES_EXCHANGE` (`matches.exchange`) | `RABBITMQ_MATCHES_QUEUE` (`matches.queue`) | `RABBITMQ_MATCHES_ROUTING_KEY` (`matches`) |
+| `results` | `RABBITMQ_RESULTS_EXCHANGE` (`results.exchange`) | `RABBITMQ_RESULTS_QUEUE` (`results.queue`) | `RABBITMQ_RESULTS_ROUTING_KEY` (`results`) |
 
-| Component   | Value                                                          |
-|-------------|----------------------------------------------------------------|
-| Exchange    | `RABBITMQ_RESULTS_EXCHANGE` (default `results.exchange`)       |
-| Queue       | `RABBITMQ_RESULTS_QUEUE` (default `results.queue`)             |
-| Routing key | `RABBITMQ_RESULTS_ROUTING_KEY` (default `results.routing.key`) |
-| Payload     | (reserved for score-result events)                             |
+### Kafka destinations
 
-### Message format
+Kafka provisions and publishes to these topics:
 
-All messages are **JSON**, serialized by Jackson via
-`Jackson2JsonMessageConverter` (which inherits the global snake-case
-`ObjectMapper`). Example payload:
+| Channel | Topic |
+|---|---|
+| `matches` | `KAFKA_MATCHES_TOPIC` (`matches`) |
+| `results` | `KAFKA_RESULTS_TOPIC` (`results`) |
+
+Kafka records intentionally use a **null record key**. Configure partitions with
+`KAFKA_PARTITIONS`; configure `KAFKA_REPLICATION_FACTOR` to a value supported by
+the cluster. Local Kafka defaults to `KAFKA_SECURITY_PROTOCOL=PLAINTEXT`. For a
+managed cluster, configure the provider's `SASL_SSL` protocol, SASL mechanism,
+JAAS login, and any required truststore/keystore settings. Kafka ACLs must grant
+the authenticated SASL or certificate principal topic administration and write
+access; they do not use the VM or container identity.
+
+### Shared payload and delivery semantics
+
+Both publishers serialize the same `Event` JSON with the global Jackson
+snake-case `ObjectMapper`; the logical payload does not change when switching
+brokers. Broker-specific metadata is kept out of the payload: RabbitMQ uses
+exchange, queue, and routing-key metadata, while Kafka uses the selected topic
+and a null record key.
+
+Publishing is **at least once per fetched response batch**. The producer waits
+for all publishes in the batch to be acknowledged before writing that response's
+`delta_last_id` cursor. A failed batch retains its previous cursor and can be
+published again, so consumers must deduplicate using a stable event identity.
+
+Example payload:
 
 ```json
 {
@@ -631,33 +679,33 @@ SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run
 
 ## Testing
 
-The current test scaffold contains the auto-generated Spring context smoke test:
+The test suite includes unit tests for broker selection, publisher behavior, and
+cursor safety, plus Testcontainers integration tests for RabbitMQ, Kafka, and
+Redis-backed cursor retry behavior.
 
-```java
-
-@SpringBootTest
-class RapidEngineApplicationTests {
-    @Test
-    void contextLoads(){
-    }
-}
-```
-
-### Recommended next steps (see [Roadmap](#-roadmap))
-
-- **Unit tests** for `EventProducer` (mock `RestTemplate` + `RedisTemplate` +
-  `RabbitTemplate`).
-- **Slice tests** (`@JsonTest`, `@DataRedisTest`) for serialization and cursor
-  logic.
-- **Testcontainers** for integration tests against a real Redis + RabbitMQ.
-- **Contract tests** (Pact / Spring Cloud Contract) between `EventProducer` and
-  downstream consumers.
-
-Run the existing tests with:
+Run all tests:
 
 ```bash
 ./mvnw test
 ```
+
+Run the unit-focused publisher and producer tests:
+
+```bash
+./mvnw test -Dtest='EventProducerTest,RabbitEventPublisherTest,KafkaEventPublisherTest'
+```
+
+Run the Testcontainers integration tests:
+
+```bash
+./mvnw test -Dtest='RabbitEventPublisherIntegrationTest,KafkaEventPublisherIntegrationTest,EventProducerCursorIntegrationTest'
+```
+
+Integration tests require a running Docker daemon. They are annotated with
+`@Testcontainers(disabledWithoutDocker = true)`, so Maven reports them as
+**skipped** rather than failing when Docker is unavailable. A Docker-enabled
+run verifies Rabbit topology and JSON delivery, Kafka topic provisioning with a
+null record key, and cursor retention after a failed publish.
 
 ---
 
@@ -686,29 +734,30 @@ development — just save a file and the app will restart.
 
 1. Create a new `XxxConfig` (mirroring `RundownConfig`).
 2. Create a new `XxxProducer` (mirroring `EventProducer`).
-3. Reuse the existing `RabbitTemplate` and `RedisTemplate` beans.
+3. Reuse the existing `EventPublisher` and `RedisTemplate` beans; do not couple
+new ingestion logic to RabbitMQ or Kafka.
 4. Wire the new producer into `MatchSyncTask` (or add a second scheduler).
 
 ### Adding a new event type
 
 1. Extend the `Event` model (or create a new DTO).
-2. Publish to the appropriate RabbitMQ exchange via the `RabbitTemplate`.
-3. Update the consumer service to subscribe to the new routing key.
+2. Add its logical destination mapping to both selected-broker publisher paths.
+3. Update consumers to subscribe to the corresponding Rabbit routing key or Kafka topic.
 
 ---
 
 ## Roadmap
 
-- [ ] **Unit & integration test suite** (Testcontainers, Mockito)
-- [ ] **Dead-letter queue (DLQ)** wiring for failed RabbitMQ publishes
+- [ ] **Dead-letter / retry policy** for failed RabbitMQ and Kafka deliveries
+- [ ] **Consumer contract tests** for the shared event payload
 - [ ] **Spring Boot Actuator** + Prometheus metrics
 - [ ] **Micrometer Tracing** (OpenTelemetry) for distributed tracing
-- [ ] **Results consumer** — populate the `results` exchange from score updates
+- [ ] **Results producer** — publish score updates to the `results` channel
 - [ ] **Configurable schedule** — drive `fixedRate` and `initialDelay` from
   `application.yml`
 - [ ] **Graceful shutdown** — finish in-flight fetches on `SIGTERM`
-- [ ] **Dockerfile + docker-compose** (app + Redis + RabbitMQ) for one-command
-  local startup
+- [ ] **Docker packaging improvements** for one-command local startup (the current
+Compose stack already starts the app, Redis, RabbitMQ, and Kafka)
 - [ ] **CI workflow** (GitHub Actions: build, test, lint)
 - [ ] **Multi-environment profiles** (`staging`, `prod`) with separate
   `application-*.yaml`
@@ -780,8 +829,8 @@ Repo: [github.com/bicosteve/rapid_engine](https://github.com/bicosteve/rapid_eng
 - [The Rundown](https://www.therundown.ai/) — the upstream sports data provider.
 - [Spring Boot](https://spring.io/projects/spring-boot) — the framework that
   powers the service.
-- [RabbitMQ](https://www.rabbitmq.com/) — the message broker used for downstream
-  delivery.
+- [RabbitMQ](https://www.rabbitmq.com/) and [Kafka](https://kafka.apache.org/) —
+the selectable message brokers for downstream delivery.
 - [Redis](https://redis.io/) — the low-latency cursor store.
 - [spring-dotenv](https://github.com/paulschwarz/spring-dotenv) — effortless
   `.env` loading.
