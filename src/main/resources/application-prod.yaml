@@ -15,32 +15,60 @@ spring:
       # Give Upstash time for the 3 way handshake since that can be slower
       timeout: ${REDIS_TIMEOUT:10000}
 
-
-
   rabbitmq:
     host: ${RABBITMQ_HOST}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME}
     password: ${RABBITMQ_PASSWORD}
     virtual-host: ${RABBITMQ_VHOST:/}
+    publisher-confirm-type: correlated
+    publisher-returns: true
     ssl:
       # CloudAMQP: set RABBITMQ_SSL_ENABLED=true and RABBITMQ_PORT=5671 to use the
       # secure AMQPS endpoint. Defaults to plain AMQP (5672) when unset.
       enabled: ${RABBITMQ_SSL_ENABLED:false}
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    security:
+      protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+    properties:
+      sasl.mechanism: "${KAFKA_SASL_MECHANISM:PLAIN}"
+      sasl.jaas.config: "${KAFKA_SASL_JAAS_CONFIG:}"
+      ssl.endpoint.identification.algorithm: "${KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM:https}"
+      ssl.truststore.location: "${KAFKA_SSL_TRUSTSTORE_LOCATION:}"
+      ssl.truststore.password: "${KAFKA_SSL_TRUSTSTORE_PASSWORD:}"
+      ssl.truststore.type: "${KAFKA_SSL_TRUSTSTORE_TYPE:JKS}"
+      ssl.keystore.location: "${KAFKA_SSL_KEYSTORE_LOCATION:}"
+      ssl.keystore.password: "${KAFKA_SSL_KEYSTORE_PASSWORD:}"
+      ssl.keystore.type: "${KAFKA_SSL_KEYSTORE_TYPE:JKS}"
+      ssl.key.password: "${KAFKA_SSL_KEY_PASSWORD:}"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+    admin:
+      auto-create: true
 
 app:
+  messaging:
+    broker: ${MESSAGING_BROKER}
   rabbitmq:
     matches:
-      exchange: ${RABBITMQ_MATCHES_EXCHANGE}
-      queue: ${RABBITMQ_MATCHES_QUEUE}
-      routing-key: ${RABBITMQ_MATCHES_ROUTING_KEY}
-
+      exchange: ${RABBITMQ_MATCHES_EXCHANGE:matches.exchange}
+      queue: ${RABBITMQ_MATCHES_QUEUE:matches.queue}
+      routing-key: ${RABBITMQ_MATCHES_ROUTING_KEY:matches}
     results:
-      exchange: ${RABBITMQ_RESULTS_EXCHANGE}
-      queue: ${RABBITMQ_RESULTS_QUEUE}
-      routing-key: ${RABBITMQ_RESULTS_ROUTING_KEY}
-
+      exchange: ${RABBITMQ_RESULTS_EXCHANGE:results.exchange}
+      queue: ${RABBITMQ_RESULTS_QUEUE:results.queue}
+      routing-key: ${RABBITMQ_RESULTS_ROUTING_KEY:results}
+  kafka:
+    matches-topic: ${KAFKA_MATCHES_TOPIC:matches}
+    results-topic: ${KAFKA_RESULTS_TOPIC:results}
+    partitions: ${KAFKA_PARTITIONS:1}
+    replication-factor: ${KAFKA_REPLICATION_FACTOR:1}
   rundown-api:
     key: ${RUNDOWN_API_KEY}
     host: ${RUNDOWN_BASE_URL}
@@ -53,7 +81,6 @@ server:
   # Bare AWS EC2 VM: we control the port directly via APP_PORT (default 5002).
   port: ${APP_PORT:5002}
 
-
 logging:
   config: classpath:rapid-engine-logback.xml
   level:
@@ -62,4 +89,3 @@ logging:
     org.apache.coyote: WARN
     org.springframework.jdbc: WARN
     org.springframework: WARN
-

@@ -1,22 +1,25 @@
 # Production compose for a single AWS EC2 VM.
 #
 # Unlike docker-compose.yml (local dev), this file:
-#   - runs the already-built image (no local build, no source bind mounts)
-#   - assumes Redis & RabbitMQ are MANAGED/REMOTE (Upstash, CloudAMQP, etc.)
-#     so no redis/rabbitmq containers are defined here
-#   - adds a Grafana Alloy agent that tails the app container's stdout and
-#     ships the JSON logs to Grafana Cloud Loki (free tier)
+# - runs the already-built image (no local build, no source bind mounts)
+# - assumes Redis and the selected messaging broker are MANAGED/REMOTE.
+# Redis, RabbitMQ, and Kafka are externally managed and not provisioned here.
+# Set MESSAGING_BROKER and the selected broker's connection variables in
+# the external env file (including KAFKA_BOOTSTRAP_SERVERS for Kafka).
+# - adds a Grafana Alloy agent that tails the app container's stdout and
+# ships the JSON logs to Grafana Cloud Loki (free tier)
 #
 # Usage on the VM:
-#   export IMAGE=ghcr.io/<owner>/rapid-engine:latest
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+# export IMAGE=ghcr.io/<owner>/rapid-engine:latest
+# export APP_ENV_FILE="$HOME/rapid-engine/.env.prod"
+# docker compose -f docker-compose.prod.yml --env-file "$APP_ENV_FILE" up -d
 
 services:
   rapid-engine:
     image: ${IMAGE:-rapid-engine:latest}
     container_name: rapid-engine
     env_file:
-      - ~/rapid-engine/.env
+      - "${APP_ENV_FILE:?Set APP_ENV_FILE to the production environment file}"
     environment:
       SPRING_PROFILES_ACTIVE: prod
     ports:
@@ -39,7 +42,7 @@ services:
     container_name: alloy
     restart: unless-stopped
     env_file:
-      - ~/rapid-engine/.env
+      - "${APP_ENV_FILE:?Set APP_ENV_FILE to the production environment file}"
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345

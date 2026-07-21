@@ -1,27 +1,27 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-name: Workflow for testing, validating, building, and publishing.
+name: Workflow for testing, validating, building, publishing, and deploying
 
 on:
   push:
     branches:
-      - feat/*
-      - fix/*
+      - 'feat/*'
+      - 'fix/*'
       - main
   pull_request:
     branches:
       - main
-
+  workflow_dispatch:
 
 env:
   JAVA_VERSION: '21'
-
   MAVEN_OPTS: '-Xmx1024m'
   DOCKER_IMAGE: bixoloo/rapid-engine
 
 jobs:
-  # STAGE::01 Tests (run unit tests, enforce 100% pass-rate gate)
+  # STAGE::01 Tests (run unit tests, enforce pass-rate gate)
   test:
     name: Stage 1::Run unittests
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -56,10 +56,10 @@ jobs:
           SKIPPED=0
           for f in "$REPORT_DIR"/TEST-*.xml; do
             [ -f "$f" ] || continue
-            TOTAL=$((    TOTAL    + $(grep -oP 'tests="\K[0-9]+'    "$f" | head -n1 || echo 0)))
+            TOTAL=$(( TOTAL + $(grep -oP 'tests="\K[0-9]+' "$f" | head -n1 || echo 0)))
             FAILURES=$(( FAILURES + $(grep -oP 'failures="\K[0-9]+' "$f" | head -n1 || echo 0)))
-            ERRORS=$((   ERRORS   + $(grep -oP 'errors="\K[0-9]+'   "$f" | head -n1 || echo 0)))
-            SKIPPED=$((  SKIPPED  + $(grep -oP 'skipped="\K[0-9]+'  "$f" | head -n1 || echo 0)))
+            ERRORS=$(( ERRORS + $(grep -oP 'errors="\K[0-9]+' "$f" | head -n1 || echo 0)))
+            SKIPPED=$(( SKIPPED + $(grep -oP 'skipped="\K[0-9]+' "$f" | head -n1 || echo 0)))
           done
 
           PASSED=$((TOTAL - FAILURES - ERRORS - SKIPPED))
@@ -76,12 +76,12 @@ jobs:
           echo "=========================================="
           echo "Test results summary"
           echo "=========================================="
-          echo "Total     : ${TOTAL}"
-          echo "Passed    : ${PASSED}"
-          echo "Failures  : ${FAILURES}"
-          echo "Errors    : ${ERRORS}"
-          echo "Skipped   : ${SKIPPED}"
-          echo "Pass rate : ${RATE_INT}.${RATE_DEC}%  (gate: 99%)"
+          echo "Total : ${TOTAL}"
+          echo "Passed : ${PASSED}"
+          echo "Failures : ${FAILURES}"
+          echo "Errors : ${ERRORS}"
+          echo "Skipped : ${SKIPPED}"
+          echo "Pass rate : ${RATE_INT}.${RATE_DEC}% (gate: 99%)"
           echo "=========================================="
 
           THRESHOLD=85
@@ -101,10 +101,10 @@ jobs:
 
   # STAGE::02 Build (package the application jar)
   build:
-    name: Stage 2::Build  the app jar file
+    name: Stage 2::Build the app jar file
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: test
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -132,12 +132,12 @@ jobs:
           path: target/*.jar
           retention-days: 1
 
-  # STAGE::03 Docker Build (build the production image, export it as an artifact)
+  # STAGE::03 Docker Build (main pushes only)
   docker-build:
     name: Stage 3::Build the application image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: build
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -166,10 +166,9 @@ jobs:
 
   docker-push:
     name: Stage 4::Push the image to Docker Hub
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: docker-build
-    # Runs only on pushes to the main branch so PRs never publish images.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Download image artifact
         uses: actions/download-artifact@v4
@@ -204,4 +203,53 @@ jobs:
           echo " - ${SHA_TAG}"
           echo " - ${LATEST_TAG}"
 
-            
+  deploy:
+    name: Load the image to the VM and deploy
+    runs-on: ubuntu-latest
+    # Manual dispatch on main deploys the existing :latest image only.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Copy the prod compose file and the Alloy config to the VM so the box
+      # always runs exactly what's in the repo (no manual drift).
+      - name: Copy deployment files to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_SSH_PORT || 22 }}
+          source: "docker-compose.prod.yml,alloy/config.alloy"
+          target: "~/rapid-engine"
+
+      # Pull the already-published :latest image from Docker Hub and restart
+      # the stack. ~/rapid-engine/.env.prod must already exist on the VM (it holds
+      # all secrets and is NEVER committed to the repo).
+      - name: Pull image and restart stack
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_SSH_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            cd ~/rapid-engine
+            export IMAGE="${{ env.DOCKER_IMAGE }}:latest"
+            export APP_ENV_FILE="$HOME/rapid-engine/.env.prod"
+            test -f "$APP_ENV_FILE"
+
+            echo "Pulling the latest image from Docker Hub..."
+            docker compose -f docker-compose.prod.yml --env-file "$APP_ENV_FILE" pull
+
+            echo "Starting/recreating the application stack..."
+            docker compose -f docker-compose.prod.yml \
+              --env-file "$APP_ENV_FILE" up -d --remove-orphans
+
+            echo "Cleaning up unused Docker images..."
+            docker image prune -f
+
+            echo "Current running containers:"
+            docker compose -f docker-compose.prod.yml --env-file "$APP_ENV_FILE" ps
