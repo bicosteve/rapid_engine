@@ -76,9 +76,21 @@ class BrokerWiringContextTest {
                         "app.rabbitmq.matches.routing-key=matches",
                         "app.rabbitmq.results.exchange=results.exchange",
                         "app.rabbitmq.results.queue=results.queue",
-                        "app.rabbitmq.results.routing-key=results",
-                        "spring.data.redis.host=localhost"
-                )
+"app.rabbitmq.results.routing-key=results",
+"spring.data.redis.host=localhost",
+"spring.data.redis.username=default",
+"spring.data.redis.port=6379",
+"spring.data.redis.database=0",
+"spring.data.redis.password=dummy-password",
+"spring.data.redis.ssl.enabled=false",
+"spring.data.redis.timeout=10000",
+"app.rundown-api.key=dummy-rundown-key",
+"app.rundown-api.host=https://rundown.example",
+"app.rundown-api.sports-id=1",
+"app.rundown-api.affiliate-id=dummy-affiliate-id",
+"app.rundown-api.poll=false",
+"app.rundown-api.delay=0"
+)
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertSingleEventPublisher(context, RabbitEventPublisher.class);
@@ -95,10 +107,22 @@ class BrokerWiringContextTest {
                 .withPropertyValues(
                         "spring.profiles.active=prod",
                         "app.messaging.broker=kafka",
-                        "spring.kafka.bootstrap-servers=localhost:9092",
-                        "spring.kafka.admin.auto-create=false",
-                        "spring.data.redis.host=localhost"
-                )
+"spring.kafka.bootstrap-servers=localhost:9092",
+"spring.kafka.admin.auto-create=false",
+"spring.data.redis.host=localhost",
+"spring.data.redis.username=default",
+"spring.data.redis.port=6379",
+"spring.data.redis.database=0",
+"spring.data.redis.password=dummy-password",
+"spring.data.redis.ssl.enabled=false",
+"spring.data.redis.timeout=10000",
+"app.rundown-api.key=dummy-rundown-key",
+"app.rundown-api.host=https://rundown.example",
+"app.rundown-api.sports-id=1",
+"app.rundown-api.affiliate-id=dummy-affiliate-id",
+"app.rundown-api.poll=false",
+"app.rundown-api.delay=0"
+)
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertSingleEventPublisher(context, KafkaEventPublisher.class);

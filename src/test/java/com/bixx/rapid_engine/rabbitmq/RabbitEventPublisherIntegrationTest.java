@@ -36,8 +36,10 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "spring.rabbitmq.publisher-confirm-type=correlated",
                 "spring.rabbitmq.publisher-returns=true",
                 "spring.kafka.admin.auto-create=false",
-                "spring.task.scheduling.enabled=false",
-                "app.rundown-api.sports-id="
+"spring.task.scheduling.enabled=false",
+"logging.level.org.springframework.jdbc=INFO",
+"server.port=0",
+"app.rundown-api.sports-id="
         }
 )
 class RabbitEventPublisherIntegrationTest {

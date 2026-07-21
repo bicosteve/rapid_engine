@@ -37,8 +37,10 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "app.kafka.partitions=1",
                 "app.kafka.replication-factor=1",
                 "spring.kafka.admin.auto-create=true",
-                "spring.task.scheduling.enabled=false",
-                "app.rundown-api.sports-id="
+"spring.task.scheduling.enabled=false",
+"logging.level.org.springframework.jdbc=INFO",
+"server.port=0",
+"app.rundown-api.sports-id="
         }
 )
 class KafkaEventPublisherIntegrationTest {
