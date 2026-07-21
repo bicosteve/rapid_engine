@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-name: Workflow for testing, validating, building, publishing, and deploying
+name: Test, Validate, Build, Publish, and Deploy
 
 on:
   push:
@@ -132,7 +132,7 @@ jobs:
           path: target/*.jar
           retention-days: 1
 
-  # STAGE::03 Docker Build (main pushes only)
+  # STAGE::03 Docker Build Image on MAIN branch PUSH ONLY
   docker-build:
     name: Stage 3::Build the application image
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -164,6 +164,7 @@ jobs:
           path: /tmp/rapid-engine-image.tar
           retention-days: 1
 
+  # Stage 4::Push the image to Docker Hub
   docker-push:
     name: Stage 4::Push the image to Docker Hub
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
