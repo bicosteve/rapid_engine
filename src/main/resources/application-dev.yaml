@@ -17,7 +17,7 @@ spring:
     publisher-returns: true
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
     security:
       protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
     properties:
@@ -43,20 +43,23 @@ spring:
 app:
   messaging:
     broker: ${MESSAGING_BROKER}
+
   rabbitmq:
     matches:
       exchange: ${RABBITMQ_MATCHES_EXCHANGE:matches.exchange}
       queue: ${RABBITMQ_MATCHES_QUEUE:matches.queue}
-      routing-key: ${RABBITMQ_MATCHES_ROUTING_KEY:matches}
+      routing-key: ${RABBITMQ_MATCHES_ROUTING_KEY:matches.routing.key}
     results:
       exchange: ${RABBITMQ_RESULTS_EXCHANGE:results.exchange}
       queue: ${RABBITMQ_RESULTS_QUEUE:results.queue}
-      routing-key: ${RABBITMQ_RESULTS_ROUTING_KEY:results}
+      routing-key: ${RABBITMQ_RESULTS_ROUTING_KEY:results.routing.key}
+
   kafka:
-    matches-topic: ${KAFKA_MATCHES_TOPIC:matches}
-    results-topic: ${KAFKA_RESULTS_TOPIC:results}
+    matches-topic: ${KAFKA_MATCHES_TOPIC:matches.topic}
+    results-topic: ${KAFKA_RESULTS_TOPIC:results.topic}
     partitions: ${KAFKA_PARTITIONS:1}
     replication-factor: ${KAFKA_REPLICATION_FACTOR:1}
+
   rundown-api:
     key: ${RUNDOWN_API_KEY}
     host: ${RUNDOWN_BASE_URL}
