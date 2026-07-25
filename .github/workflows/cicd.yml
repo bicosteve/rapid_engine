@@ -225,6 +225,25 @@ jobs:
           source: "docker-compose.prod.yml,alloy/config.alloy"
           target: "~/rapid-engine"
 
+      - name: Write Kafka CA certificate to VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          KAFKA_CA_CERTIFICATE: ${{ secrets.KAFKA_CA_CERTIFICATE }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_SSH_PORT || 22 }}
+          envs: KAFKA_CA_CERTIFICATE
+          script: |
+            set -eou pipefail
+            mkdir -p ~/rapid-engine/certs
+            cat > ~/rapid-engine/certs/kafka-ca.pem << 'EOF'
+              $KAFKA_CA_CERTIFICATE
+            EOF
+            chmod 600 ~/rapid-engine/certs/kafka-ca.pem
+      
+
       # Pull the already-published :latest image from Docker Hub and restart
       # the stack. ~/rapid-engine/.env must already exist on the VM (it holds
       # all secrets and is NEVER committed to the repo).
