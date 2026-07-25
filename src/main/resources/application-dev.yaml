@@ -39,7 +39,6 @@ spring:
         enable.idempotence: true
     admin:
       auto-create: true
-
 app:
   messaging:
     broker: ${MESSAGING_BROKER}
