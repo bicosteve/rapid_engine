@@ -241,7 +241,7 @@ jobs:
             cat > ~/rapid-engine/certs/kafka-ca.pem <<EOF
             $KAFKA_CA_CERTIFICATE
             EOF
-            chmod 600 ~/rapid-engine/certs/kafka-ca.pem
+            chmod 644 ~/rapid-engine/certs/kafka-ca.pem
       
 
       # Pull the already-published :latest image from Docker Hub and restart
