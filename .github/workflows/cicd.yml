@@ -238,8 +238,8 @@ jobs:
           script: |
             set -eou pipefail
             mkdir -p ~/rapid-engine/certs
-            cat > ~/rapid-engine/certs/kafka-ca.pem << 'EOF'
-              $KAFKA_CA_CERTIFICATE
+            cat > ~/rapid-engine/certs/kafka-ca.pem <<EOF
+            $KAFKA_CA_CERTIFICATE
             EOF
             chmod 600 ~/rapid-engine/certs/kafka-ca.pem
       
