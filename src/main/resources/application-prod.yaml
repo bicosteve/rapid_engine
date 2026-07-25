@@ -50,7 +50,7 @@ spring:
       properties:
         enable.idempotence: true
     admin:
-      auto-create: true
+      auto-create: false
 
 app:
   messaging:
